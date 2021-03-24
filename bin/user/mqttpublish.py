@@ -467,7 +467,7 @@ class MQTTPublish(object):
         """ Republish failed messages."""
         row_count, = self.mqtt_dbm.getSql("SELECT COUNT(*) from archive where pub_dateTime is null;")
         # ToDo - configurable?
-        while row_count > 10:
+        while row_count > 0:
             rows = list(self.mqtt_dbm.genSql(
                 "SELECT dateTime, mid, qos, topic, data FROM archive where pub_dateTime is null ORDER BY dateTime  ASC;"))
 
