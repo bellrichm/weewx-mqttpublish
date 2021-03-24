@@ -1,5 +1,8 @@
 
-""" prototype a persistent queue and persistent mqtt
+""" 
+publish to MQTT. 
+Supports publishing "immediately" on loop or archive creation.
+And/Or publishing from an externa/persistent queue.
 
 Configuration:
 [MQTTPublish]
@@ -133,9 +136,9 @@ Configuration:
             # The unit system for data published to this topic.
             # The default is US.
             unit_system = US
-
 """
 # todo - rename table
+
 # need to be python 2 compatible pylint: disable=bad-option-value, raise-missing-from, super-with-arguments
 # pylint: enable=bad-option-value
 try:
@@ -483,7 +486,7 @@ class MQTTPublish(object):
             row_count, = self.mqtt_dbm.getSql("SELECT COUNT(*) from archive where pub_dateTime is null;")
 
 class PublishWeeWX(StdService):
-    """ A service to put data on to an internal queue. """
+    """ A service to publish WeeWX loop and/or archive data to MQTT. """
     def __init__(self, engine, config_dict):
         super(PublishWeeWX, self).__init__(engine, config_dict)
         self.publish_type = 'WeeWX'
@@ -536,6 +539,7 @@ class PublishWeeWX(StdService):
 
 class PublishQueue(StdService):
     """ A service to put data on to an external queue. """
+    """ A service to publish an external/persistent queue to MQTT. """
     def __init__(self, engine, config_dict):
         super(PublishQueue, self).__init__(engine, config_dict)
         self.publish_type = 'Queue'
@@ -872,7 +876,7 @@ class PublishQueueThread(AbstractPublishThread):
                 raise exception
 
 class PublishWeeWXThread(AbstractPublishThread):
-    """ process queue in separate thread, maybe someday process? """
+    """Publish WeeWX data to MQTT. """
     # pylint: disable=too-many-instance-attributes
     def __init__(self, config_dict, data_queue):
         super(PublishWeeWXThread, self).__init__('WeeWX')
@@ -926,6 +930,12 @@ class PublishWeeWXThread(AbstractPublishThread):
 
         loginf(self.publish_type, "thread shutdown")
 
+# Example invocations. Paths may vary.
+# setup.py install:
+# PYTHONPATH=/home/weewx/bin python /home/weewx/bin/user/MQTTSubscribe.py
+#
+# rpm or deb package install:
+# PYTHONPATH=/usr/share/weewx python /usr/share/weewx/user/MQTTSubscribe.py
 if __name__ == "__main__":
     def main():
         """ Run it. """
