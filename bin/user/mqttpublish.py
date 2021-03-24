@@ -466,6 +466,7 @@ class MQTTPublish(object):
     def republish_message(self):
         """ Republish failed messages."""
         row_count, = self.mqtt_dbm.getSql("SELECT COUNT(*) from archive where pub_dateTime is null;")
+        # ToDo - configurable?
         while row_count > 10:
             rows = list(self.mqtt_dbm.genSql(
                 "SELECT dateTime, mid, qos, topic, data FROM archive where pub_dateTime is null ORDER BY dateTime  ASC;"))
@@ -483,6 +484,12 @@ class MQTTPublish(object):
             self.wait_for_inflight_messages()
 
             row_count, = self.mqtt_dbm.getSql("SELECT COUNT(*) from archive where pub_dateTime is null;")
+
+    def cancel_message(self):
+        """ Cancel messages that are inflight. """
+        # todo - configurable
+        max_time = time.time() - 24 * 60 * 60
+        self.mqtt_dbm.getSql("Delete from archive where pub_dateTime is null and proc_dateTime  < ?", [max_time])
 
 class PublishWeeWX(StdService):
     """ A service to publish WeeWX loop and/or archive data to MQTT. """
@@ -947,6 +954,8 @@ if __name__ == "__main__":
                             help="Perform a deep cleanup up processed messages")
         parser.add_argument("--republish", action="store_true", dest="republish",
                             help="Republish failed messages")
+        parser.add_argument("--cancel", action="store_true", dest="cancel",
+                            help="Cancel failed messages")
         parser.add_argument("--publish", action="store_true", dest="publish",
                             help="Publish messages")
         parser.add_argument("config_file")
@@ -966,6 +975,9 @@ if __name__ == "__main__":
 
         if options.deep_clean:
             mqtt_publish.deep_clean()
+
+        if options.cancel:
+            mqtt_publish.cancel_message()
 
         if options.republish:
             mqtt_publish.republish_message()
