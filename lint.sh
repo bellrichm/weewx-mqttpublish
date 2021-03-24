@@ -12,4 +12,4 @@ echo "Running python $PYENV_VERSION weewx $WEEWX"
 
 
 PYTHONPATH=bin:../$WEEWX/bin python -m pylint ./bin/user -d duplicate-code
-PYTHONPATH=bin:../$WEEWX/bin python -m pylint ./bin/user/tests/*.py -d duplicate-code
+#PYTHONPATH=bin:../$WEEWX/bin python -m pylint ./bin/user/tests/*.py -d duplicate-code
