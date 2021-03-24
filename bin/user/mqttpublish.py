@@ -1,6 +1,5 @@
-
-""" 
-publish to MQTT. 
+"""
+Publish to MQTT.
 Supports publishing "immediately" on loop or archive creation.
 And/Or publishing from an externa/persistent queue.
 
@@ -538,7 +537,6 @@ class PublishWeeWX(StdService):
             self._thread = None
 
 class PublishQueue(StdService):
-    """ A service to put data on to an external queue. """
     """ A service to publish an external/persistent queue to MQTT. """
     def __init__(self, engine, config_dict):
         super(PublishQueue, self).__init__(engine, config_dict)
