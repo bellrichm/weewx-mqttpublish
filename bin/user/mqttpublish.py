@@ -817,7 +817,7 @@ class PublishQueueThread(AbstractPublishThread):
                     time_sleep = self.wait_before_retry
                 # ensures that pub/sub messages and mqtt keepalive traffic is maintained with broker.
                 if time_sleep > self.keepalive:
-                    time_sleep = self.keepalive/2
+                    time_sleep = self.keepalive/4
 
                 logdbg(self.publish_type, "Sleeping   (%s): %s" %(int(time.time()), time_sleep))
                 self.threading_event.wait(time_sleep)
