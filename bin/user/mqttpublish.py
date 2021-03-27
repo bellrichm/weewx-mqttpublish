@@ -137,6 +137,9 @@ Configuration:
             unit_system = US
 """
 # todo - rename table
+# todo - add option to keep x amount of records when 'cleaning'
+# todo - perform clean automatically, using the option above
+# todo - change the dbm to 'Manager'
 
 # need to be python 2 compatible pylint: disable=bad-option-value, raise-missing-from, super-with-arguments
 # pylint: enable=bad-option-value
@@ -576,6 +579,24 @@ class PublishQueue(StdService):
 
 class AbstractPublishThread(threading.Thread):
     """ Some base functionality for publishing. """
+    UNIT_REDUCTIONS = {
+        'degree_F': 'F',
+        'degree_C': 'C',
+        'inch': 'in',
+        'mile_per_hour': 'mph',
+        'mile_per_hour2': 'mph',
+        'km_per_hour': 'kph',
+        'km_per_hour2': 'kph',
+        'knot': 'knot',
+        'knot2': 'knot2',
+        'meter_per_second': 'mps',
+        'meter_per_second2': 'mps',
+        'degree_compass': None,
+        'watt_per_meter_squared': 'Wpm2',
+        'uv_index': None,
+        'percent': None,
+        'unix_epoch': None,
+        }
     def __init__(self, publish_type):
         threading.Thread.__init__(self)
 
@@ -700,6 +721,7 @@ class AbstractPublishThread(threading.Thread):
         append_unit_label = fieldinfo.get('append_unit_label', topic_dict.get('append_unit_label'))
         if append_unit_label:
             (unit_type, _) = weewx.units.getStandardUnitType(unit_system, name)
+            unit_type = AbstractPublishThread.UNIT_REDUCTIONS.get(unit_type, unit_type)
             if unit_type is not None:
                 name = "%s_%s" % (name, unit_type)
 
