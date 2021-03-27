@@ -605,7 +605,7 @@ class AbstractPublishThread(threading.Thread):
 
         self.publish_type = publish_type
 
-    def configure_fields(self, fields_dict, ignore, append_unit_label, conversion_type, format_string):
+    def configure_fields(self, fields_dict, ignore, publish_none_value, append_unit_label, conversion_type, format_string):
         """ Configure the fields. """
         # pylint: disable=too-many-arguments
         fields = {}
@@ -615,6 +615,7 @@ class AbstractPublishThread(threading.Thread):
             fields[field]['name'] = field_dict.get('name', None)
             fields[field]['unit'] = field_dict.get('unit', None)
             fields[field]['ignore'] = to_bool(field_dict.get('ignore', ignore))
+            fields[field]['publish_none_value'] = to_bool(field_dict.get('publish_none_value', publish_none_value))
             fields[field]['append_unit_label'] = to_bool(field_dict.get('append_unit_label', append_unit_label))
             fields[field]['conversion_type'] = field_dict.get('conversion_type', conversion_type)
             fields[field]['format_string'] = field_dict.get('format_string', format_string)
@@ -652,13 +653,14 @@ class AbstractPublishThread(threading.Thread):
                 unit_system = weewx.units.unit_constants[unit_system_name]
 
             ignore = to_bool(topic_dict.get('ignore', False))
+            publish_none_value = to_bool(topic_dict.get('publish_none_value', False))
             append_unit_label = to_bool(topic_dict.get('append_unit_label', default_append_label))
             conversion_type = topic_dict.get('conversion_type', default_conversion_type)
             format_string = topic_dict.get('format', default_format_string)
             fields_dict = topic_dict.get('fields', None)
             fields = {}
             if fields_dict is not None:
-                fields = self.configure_fields(fields_dict, ignore, append_unit_label, conversion_type, format_string)
+                fields = self.configure_fields(fields_dict, ignore, publish_none_value, append_unit_label, conversion_type, format_string)
 
             if 'loop' in binding:
                 if not publish:
@@ -706,7 +708,11 @@ class AbstractPublishThread(threading.Thread):
         for field in updated_record:
             fieldinfo = topic_dict['fields'].get(field, {})
             ignore = fieldinfo.get('ignore', topic_dict.get('ignore'))
+            publish_none_value = fieldinfo.get('publish_none_value', topic_dict.get('publish_none_value'))
+
             if ignore:
+                continue
+            if updated_record[field] is None and not publish_none_value:
                 continue
 
             (name, value) = self.update_field(topic_dict, fieldinfo, field, updated_record[field], updated_record['usUnits'])
