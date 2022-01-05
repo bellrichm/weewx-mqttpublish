@@ -250,8 +250,11 @@ def gettid():
 
 class MQTTPublish(object):
     """ Managing publishing to MQTT. """
-    def __init__(self, publish_type, db_binder, service_dict):
+    def __init__(self, publisher, publish_type, db_binder, service_dict):
 
+        self.retries = 0
+        # ToDo - configure
+        self.max_retries = 5
         self.connected = False
         self.mids = {}
         self.mqtt_logger = {
@@ -262,6 +265,7 @@ class MQTTPublish(object):
             mqtt.MQTT_LOG_DEBUG: logdbg
             }
 
+        self.publisher = publisher
         self.publish_type = publish_type
 
         mqtt_binding = service_dict.get('mqtt_data_binding', 'mqtt_queue_binding')
@@ -395,7 +399,13 @@ class MQTTPublish(object):
         if rc != 0:
             # todo - research more
             # todo - retry logic
-            loginf(self.publish_type, "Reconnecting...")
+            self.retries += 1
+            if self.retries > self.max_retries:
+                # self.shut_down()
+                # Shut thread down, a bit of a hack
+                self.publisher.running = False
+                return
+            loginf(self.publish_type, "Reconnecting, try %i of %i" %(self.retries, self.max_retries))
             self.client.reconnect()
             # Could not put a retry loop here because a second loop() call never returns
             logdbg(self.publish_type, "reconnected")
@@ -519,17 +529,39 @@ class PublishWeeWX(StdService):
             self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
 
         self._thread = PublishWeeWXThread(config_dict, self.data_queue)
-        self._thread.start()
+        self.thread_start()
 
         logdbg(self.publish_type, "Threadid of PublishWeeWX is: %s" % gettid())
 
+    def thread_start(self):
+        loginf(self.publish_type, "starting thread")
+        self._thread.start()
+        # ToDo - configure how long to wait for thread to start
+        self.thread_start_wait = 5.0
+        start_time = time.time()
+        loginf(self.publish_type, "joining thread")
+        #self._thread.join(self.thread_start_wait)
+        loginf(self.publish_type, "joined thread")
+        end_time = time.time()
+        run_time = end_time - start_time
+        
+        if not self._thread.is_alive():
+            loginf(self.publish_type, "oh no")
+            raise WeeWX.WakeupError("Unable to start MQTT publishing thread.")
+        loginf(self.publish_type, start_time)
+        loginf(self.publish_type, end_time)
+        loginf(self.publish_type, run_time)
+        loginf(self.publish_type, "started thread")
+
     def new_loop_packet(self, event):
         """ Handle loop packets. """
+         # Todo - if thread is not running, try to start it
         self.data_queue.put({'time_stamp': event.packet['dateTime'], 'type': 'loop', 'data': event.packet})
         self._thread.threading_event.set()
 
     def new_archive_record(self, event):
         """ Handle archive records. """
+        # Todo - if thread is not running, try to start it
         self.data_queue.put({'time_stamp': event.record['dateTime'], 'type': 'archive', 'data': event.record})
         self._thread.threading_event.set()
 
@@ -560,9 +592,25 @@ class PublishQueue(StdService):
             return
 
         self._thread = PublishQueueThread(config_dict)
-        self._thread.start()
+        self.thread_start()
 
         logdbg(self.publish_type, "Threadid of PublishQueue is: %s" % gettid())
+
+        # Todo, check that thread is alive
+        # not sure what event to use, probably new_archive_record
+
+    def thread_start(self):
+        self._thread.start()
+        # ToDo - configure how long to wait for thread to start
+        self.thread_start_wait = 10.0
+        start_time = time.time()
+        self._thread.join(self.thread_start_wait)
+        run_time = time.time() - start_time
+        
+        if not self._thread.is_alive():
+            loginf(self.publish_type, "oh no")
+            raise WeeWX.WakeupError("Unable to start MQTT publishing thread.")
+        loginf(self.publish_type, run_time)        
 
     def shutDown(self): # need to override parent - pylint: disable=invalid-name
         """Run when an engine shutdown is requested."""
@@ -830,7 +878,7 @@ class PublishQueueThread(AbstractPublishThread):
         self.dbm = self.db_binder.get_manager(data_binding=self.binding)
 
         # need to instantiate inside thread
-        self.mqtt_publish = MQTTPublish('Queue', self.db_binder, self.service_dict)
+        self.mqtt_publish = MQTTPublish(self, 'Queue', self.db_binder, self.service_dict)
 
         self.catchup()
 
@@ -936,7 +984,7 @@ class PublishWeeWXThread(AbstractPublishThread):
         logdbg(self.publish_type, "Threadid of PublishWeeWXThread: %s" % gettid())
 
         # need to instantiate inside thread
-        self.mqtt_publish = MQTTPublish('WeeWX', self.db_binder, self.service_dict)
+        self.mqtt_publish = MQTTPublish(self, 'WeeWX', self.db_binder, self.service_dict)
 
         while self.running:
             try:
@@ -997,7 +1045,7 @@ if __name__ == "__main__":
         db_binder = weewx.manager.DBBinder(config_dict)
 
         service_dict = config_dict.get('PublishQueue', {})
-        mqtt_publish = MQTTPublish('     ', db_binder, service_dict)
+        mqtt_publish = MQTTPublish(None, '     ', db_binder, service_dict)
         if options.clean:
             mqtt_publish.cleanup()
 
