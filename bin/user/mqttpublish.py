@@ -270,16 +270,16 @@ class MQTTPublish(object):
 
         mqtt_binding = service_dict.get('mqtt_data_binding', 'mqtt_queue_binding')
         log_mqtt = to_bool(service_dict.get('log', False))
-        host = service_dict.get('host', 'localhost')
-        keepalive = to_int(service_dict.get('keepalive', 60))
-        port = to_int(service_dict.get('port', 1883))
+        self.host = service_dict.get('host', 'localhost')
+        self.keepalive = to_int(service_dict.get('keepalive', 60))
+        self.port = to_int(service_dict.get('port', 1883))
         username = service_dict.get('username', None)
         password = service_dict.get('password', None)
         clientid = service_dict.get('clientid', 'MQTTPublish-' + str(random.randint(1000, 9999)))
 
-        loginf(self.publish_type, "host is %s" % host)
-        loginf(self.publish_type, "port is %s" % port)
-        loginf(self.publish_type, "keepalive is %s" % keepalive)
+        loginf(self.publish_type, "host is %s" % self.host)
+        loginf(self.publish_type, "port is %s" % self.port)
+        loginf(self.publish_type, "keepalive is %s" % self.keepalive)
         loginf(self.publish_type, "username is %s" % username)
         if password is not None:
             loginf(self.publish_type, "password is set")
@@ -303,15 +303,18 @@ class MQTTPublish(object):
         if tls_dict:
             self.config_tls(tls_dict)
 
-        self.client.connect(host, port, keepalive)
+        # self._connect()
+
+        self.mqtt_dbm = db_binder.get_manager(data_binding=mqtt_binding, initialize=True)
+        self.mqtt_dbm.getSql("PRAGMA journal_mode=WAL;")
+
+    def _connect(self):
+        self.client.connect(self.host, self.port, self.keepalive)
         # todo configure loop count and sleep amount
         while not self.connected:
             logdbg(self.publish_type, "waiting")
             time.sleep(5) # todo, change to event
             self.client.loop(timeout=0.1)
-
-        self.mqtt_dbm = db_binder.get_manager(data_binding=mqtt_binding, initialize=True)
-        self.mqtt_dbm.getSql("PRAGMA journal_mode=WAL;")
 
     def config_tls(self, tls_dict):
         """ Configure TLS."""
@@ -451,6 +454,8 @@ class MQTTPublish(object):
     def publish_message(self, time_stamp, prev_mid, guarantee_delivery, qos, retain, topic, data):
         """ Publish the message. """
         # pylint: disable=too-many-arguments
+        if not self.connected:
+            self._connect()
         mqtt_message_info = self.client.publish(topic, data, qos=qos, retain=retain)
         logdbg(self.publish_type, "Publishing (%s): %s %s %s %s" % (int(time.time()), int(time_stamp), mqtt_message_info.mid, qos, topic))
         if guarantee_delivery:
@@ -548,9 +553,9 @@ class PublishWeeWX(StdService):
         if not self._thread.is_alive():
             loginf(self.publish_type, "oh no")
             raise WeeWX.WakeupError("Unable to start MQTT publishing thread.")
-        loginf(self.publish_type, start_time)
-        loginf(self.publish_type, end_time)
-        loginf(self.publish_type, run_time)
+        #loginf(self.publish_type, start_time)
+        #loginf(self.publish_type, end_time)
+        #loginf(self.publish_type, run_time)
         loginf(self.publish_type, "started thread")
 
     def new_loop_packet(self, event):
@@ -610,7 +615,7 @@ class PublishQueue(StdService):
         if not self._thread.is_alive():
             loginf(self.publish_type, "oh no")
             raise WeeWX.WakeupError("Unable to start MQTT publishing thread.")
-        loginf(self.publish_type, run_time)        
+        #loginf(self.publish_type, run_time)        
 
     def shutDown(self): # need to override parent - pylint: disable=invalid-name
         """Run when an engine shutdown is requested."""
