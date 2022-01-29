@@ -303,7 +303,7 @@ class MQTTPublish(object):
         if tls_dict:
             self.config_tls(tls_dict)
 
-        # self._connect()
+        self._connect()
 
         self.mqtt_dbm = db_binder.get_manager(data_binding=mqtt_binding, initialize=True)
         self.mqtt_dbm.getSql("PRAGMA journal_mode=WAL;")
@@ -315,6 +315,15 @@ class MQTTPublish(object):
             logdbg(self.publish_type, "waiting")
             time.sleep(5) # todo, change to event
             self.client.loop(timeout=0.1)
+
+    def _reconnect(self):
+        self.client.reconnect()
+        # todo configure loop count and sleep amount
+        while not self.connected:
+            logdbg(self.publish_type, "waiting")
+            time.sleep(1) # todo, change to event
+            self.client.loop(timeout=0.1)
+        loginf(self.publish_type, "reconnected")
 
     def config_tls(self, tls_dict):
         """ Configure TLS."""
@@ -396,22 +405,12 @@ class MQTTPublish(object):
         # If MQTT_ERR_SUCCESS (0), the callback was called in response to a disconnect() call.
         # If any other value the disconnection was unexpected,
         # such as might be caused by a network error.
-        # Note, a rc = 1 is used as a general return code, so no use looking up the string
-        loginf(self.publish_type, "Disconnected with result code %i" % rc)
+        loginf(self.publish_type, "Disconnected with result code %i, %s" %(rc, mqtt.error_string(rc)))
+
+        # As of 1.6.1, Paho MQTT cannot have a callback invoke a second callback. So we won't attempt to reconnect here.
+        # Because that would cause the on_connect callback to be called. Instead we will just mark as not connected.
+        # And check the flag before attempting to publish.
         self.connected = False
-        if rc != 0:
-            # todo - research more
-            # todo - retry logic
-            self.retries += 1
-            if self.retries > self.max_retries:
-                # self.shut_down()
-                # Shut thread down, a bit of a hack
-                self.publisher.running = False
-                return
-            loginf(self.publish_type, "Reconnecting, try %i of %i" %(self.retries, self.max_retries))
-            self.client.reconnect()
-            # Could not put a retry loop here because a second loop() call never returns
-            logdbg(self.publish_type, "reconnected")
 
     def on_publish(self, client, userdata, mid):  # (match callback signature) pylint: disable=unused-argument
         """ The on_publish callback. """
@@ -455,7 +454,7 @@ class MQTTPublish(object):
         """ Publish the message. """
         # pylint: disable=too-many-arguments
         if not self.connected:
-            self._connect()
+            self._reconnect()
         mqtt_message_info = self.client.publish(topic, data, qos=qos, retain=retain)
         logdbg(self.publish_type, "Publishing (%s): %s %s %s %s" % (int(time.time()), int(time_stamp), mqtt_message_info.mid, qos, topic))
         if guarantee_delivery:
