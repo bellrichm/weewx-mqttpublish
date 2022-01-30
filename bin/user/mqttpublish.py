@@ -311,18 +311,39 @@ class MQTTPublish(object):
     def _connect(self):
         self.client.connect(self.host, self.port, self.keepalive)
         # todo configure loop count and sleep amount
+        retries = 0
+        self.client.loop(timeout=1.0)
         while not self.connected:
             logdbg(self.publish_type, "waiting")
-            time.sleep(5) # todo, change to event
-            self.client.loop(timeout=0.1)
+            self.client.loop(timeout=5.0)
+
+            retries += 1
+            if retries > self.max_retries:
+                # self.shut_down()
+                # Shut thread down, a bit of a hack
+                self.publisher.running = False
+                return
+
+            self.client.connect(self.host, self.port, self.keepalive)
 
     def _reconnect(self):
         self.client.reconnect()
         # todo configure loop count and sleep amount
+        retries = 0
+        self.client.loop(timeout=1.0)
         while not self.connected:
             logdbg(self.publish_type, "waiting")
-            time.sleep(1) # todo, change to event
-            self.client.loop(timeout=0.1)
+            self.client.loop(timeout=5.0)
+
+            retries += 1
+            if retries > self.max_retries:
+                # self.shut_down()
+                # Shut thread down, a bit of a hack
+                self.publisher.running = False
+                return            
+
+            self.client.reconnect()
+        
         loginf(self.publish_type, "reconnected")
 
     def config_tls(self, tls_dict):
