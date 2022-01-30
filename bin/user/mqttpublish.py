@@ -251,10 +251,6 @@ def gettid():
 class MQTTPublish(object):
     """ Managing publishing to MQTT. """
     def __init__(self, publisher, publish_type, db_binder, service_dict):
-
-        self.retries = 0
-        # ToDo - configure
-        self.max_retries = 5
         self.connected = False
         self.mids = {}
         self.mqtt_logger = {
@@ -268,6 +264,8 @@ class MQTTPublish(object):
         self.publisher = publisher
         self.publish_type = publish_type
 
+        self.max_retries = to_int(service_dict.get('max_retries', 5))
+        self.retry_wait = to_int(service_dict.get('retry_wait', 5))
         mqtt_binding = service_dict.get('mqtt_data_binding', 'mqtt_queue_binding')
         log_mqtt = to_bool(service_dict.get('log', False))
         self.host = service_dict.get('host', 'localhost')
@@ -310,7 +308,6 @@ class MQTTPublish(object):
 
     def _connect(self):
         self.client.connect(self.host, self.port, self.keepalive)
-        # todo configure loop count and sleep amount
         retries = 0
         self.client.loop(timeout=1.0)
         while not self.connected:
@@ -328,7 +325,6 @@ class MQTTPublish(object):
 
     def _reconnect(self):
         self.client.reconnect()
-        # todo configure loop count and sleep amount
         retries = 0
         self.client.loop(timeout=1.0)
         while not self.connected:
