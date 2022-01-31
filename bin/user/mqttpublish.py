@@ -324,9 +324,13 @@ class MQTTPublish(object):
             self.client.connect(self.host, self.port, self.keepalive)
 
     def _reconnect(self):
+        logdbg(self.publish_type, "*** Before reconnect ***")
         self.client.reconnect()
+        logdbg(self.publish_type, "*** After reconnect ***")
         retries = 0
+        logdbg(self.publish_type, "*** Before loop ***")
         self.client.loop(timeout=1.0)
+        logdbg(self.publish_type, "*** After loop ***")
         while not self.connected:
             logdbg(self.publish_type, "waiting")
             self.client.loop(timeout=5.0)
@@ -994,6 +998,8 @@ class PublishWeeWXThread(AbstractPublishThread):
 
         self.topics_loop, self.topics_archive = self.configure_topics(self.service_dict)
         self.wait_before_retry = float(self.service_dict.get('wait_before_retry', 2))
+        self.keepalive = to_int(self.service_dict.get('keepalive', 60))
+
 
         loginf(self.publish_type, "Wait before retry is %i" % self.wait_before_retry)
 
