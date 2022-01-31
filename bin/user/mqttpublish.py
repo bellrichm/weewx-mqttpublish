@@ -1021,7 +1021,8 @@ class PublishWeeWXThread(AbstractPublishThread):
                     logerr(self.publish_type, "Unknown data type, %s" % data_type)
             except Queue.Empty:
                 self.mqtt_publish.client.loop(timeout=0.1)
-                self.threading_event.wait(150)
+                # ToDo - investigate my 'sleep' implementation
+                self.threading_event.wait(self.keepalive/4)
                 self.threading_event.clear()
 
         loginf(self.publish_type, "exited loop")
