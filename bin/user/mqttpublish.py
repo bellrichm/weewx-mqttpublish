@@ -386,8 +386,6 @@ class MQTTPublish(object):
             pass
 
         ca_certs = tls_dict.get('ca_certs')
-        if ca_certs is None:
-            raise ValueError("'ca_certs' is required.")
 
         valid_cert_reqs = valid_cert_reqs.get(tls_dict.get('certs_required', 'required'))
         if valid_cert_reqs is None:
