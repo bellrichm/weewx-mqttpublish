@@ -309,10 +309,14 @@ class MQTTPublish(object):
     def _connect(self):
         self.client.connect(self.host, self.port, self.keepalive)
         retries = 0
-        self.client.loop(timeout=1.0)
+        # loop seems to break before connect, perhaps due to logging
+        self.client.loop(timeout=0.1)
+        time.sleep(1)
         while not self.connected:
             logdbg(self.publish_type, "waiting")
-            self.client.loop(timeout=5.0)
+            # loop seems to break before connect, perhaps due to logging
+            self.client.loop(timeout=0.1)
+            time.sleep(5)
 
             retries += 1
             if retries > self.max_retries:
