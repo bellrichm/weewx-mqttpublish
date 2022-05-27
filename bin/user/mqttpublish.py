@@ -307,7 +307,11 @@ class MQTTPublish(object):
         self.mqtt_dbm.getSql("PRAGMA journal_mode=WAL;")
 
     def _connect(self):
-        self.client.connect(self.host, self.port, self.keepalive)
+        try:
+            self.client.connect(self.host, self.port, self.keepalive)
+        except Exception as exception: # (want to catch all) pylint: disable=broad-except
+            logerr(self.publish_type, "MQTT connect failed with %s and reason %s." % (type(exception), exception))
+            logerr(self.publish_type, "%s" % traceback.format_exc())
         retries = 0
         # loop seems to break before connect, perhaps due to logging
         self.client.loop(timeout=0.1)
@@ -325,7 +329,11 @@ class MQTTPublish(object):
                 self.publisher.running = False
                 return
 
-            self.client.connect(self.host, self.port, self.keepalive)
+            try:
+                self.client.connect(self.host, self.port, self.keepalive)
+            except Exception as exception: # (want to catch all) pylint: disable=broad-except
+                logerr(self.publish_type, "MQTT connect failed with %s and reason %s." % (type(exception), exception))
+                logerr(self.publish_type, "%s" % traceback.format_exc())
 
     def _reconnect(self):
         logdbg(self.publish_type, "*** Before reconnect ***")
@@ -545,7 +553,7 @@ class PublishWeeWX(StdService):
             return
 
         # todo, tie this into the topic bindings somehow...
-        binding = weeutil.weeutil.option_as_list(service_dict.get('binding', ['loop']))
+        binding = weeutil.weeutil.option_as_list(service_dict.get('binding', ['archive', 'loop']))
 
         self.data_queue = Queue.Queue()
 
@@ -574,7 +582,7 @@ class PublishWeeWX(StdService):
         
         if not self._thread.is_alive():
             loginf(self.publish_type, "oh no")
-            raise WeeWX.WakeupError("Unable to start MQTT publishing thread.")
+            raise weewx.WakeupError("Unable to start MQTT publishing thread.")
         #loginf(self.publish_type, start_time)
         #loginf(self.publish_type, end_time)
         #loginf(self.publish_type, run_time)
@@ -582,13 +590,19 @@ class PublishWeeWX(StdService):
 
     def new_loop_packet(self, event):
         """ Handle loop packets. """
-         # Todo - if thread is not running, try to start it
+        # Todo - if thread is not running, try to start it
+        if not self._thread.running:
+            raise weewx.StopNow("MQTT publishing thread has stopped.")
+
         self.data_queue.put({'time_stamp': event.packet['dateTime'], 'type': 'loop', 'data': event.packet})
         self._thread.threading_event.set()
 
     def new_archive_record(self, event):
         """ Handle archive records. """
         # Todo - if thread is not running, try to start it
+        if not self._thread.running:
+            raise weewx.StopNow()
+
         self.data_queue.put({'time_stamp': event.record['dateTime'], 'type': 'archive', 'data': event.record})
         self._thread.threading_event.set()
 
@@ -636,7 +650,7 @@ class PublishQueue(StdService):
         
         if not self._thread.is_alive():
             loginf(self.publish_type, "oh no")
-            raise WeeWX.WakeupError("Unable to start MQTT publishing thread.")
+            raise weewx.WakeupError("Unable to start MQTT publishing thread.")
         #loginf(self.publish_type, run_time)        
 
     def shutDown(self): # need to override parent - pylint: disable=invalid-name
