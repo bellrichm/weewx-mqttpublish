@@ -352,10 +352,10 @@ class MQTTPublish(object):
                 # self.shut_down()
                 # Shut thread down, a bit of a hack
                 self.publisher.running = False
-                return            
+                return
 
             self.client.reconnect()
-        
+
         loginf(self.publish_type, "reconnected")
 
     def config_tls(self, tls_dict):
@@ -573,13 +573,10 @@ class PublishWeeWX(StdService):
         self._thread.start()
         # ToDo - configure how long to wait for thread to start
         self.thread_start_wait = 5.0
-        start_time = time.time()
         loginf(self.publish_type, "joining thread")
         #self._thread.join(self.thread_start_wait)
         loginf(self.publish_type, "joined thread")
-        end_time = time.time()
-        run_time = end_time - start_time
-        
+
         if not self._thread.is_alive():
             loginf(self.publish_type, "oh no")
             raise weewx.WakeupError("Unable to start MQTT publishing thread.")
@@ -644,14 +641,12 @@ class PublishQueue(StdService):
         self._thread.start()
         # ToDo - configure how long to wait for thread to start
         self.thread_start_wait = 10.0
-        start_time = time.time()
         self._thread.join(self.thread_start_wait)
-        run_time = time.time() - start_time
-        
+
         if not self._thread.is_alive():
             loginf(self.publish_type, "oh no")
             raise weewx.WakeupError("Unable to start MQTT publishing thread.")
-        #loginf(self.publish_type, run_time)        
+        #loginf(self.publish_type, run_time)
 
     def shutDown(self): # need to override parent - pylint: disable=invalid-name
         """Run when an engine shutdown is requested."""
