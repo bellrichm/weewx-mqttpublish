@@ -552,6 +552,9 @@ class PublishWeeWX(StdService):
             loginf(self.publish_type, "Not enabled, exiting.")
             return
 
+        # todo - make configurable
+        self.kill_weewx = []
+
         # todo, tie this into the topic bindings somehow...
         binding = weeutil.weeutil.option_as_list(service_dict.get('binding', ['archive', 'loop']))
 
@@ -587,21 +590,20 @@ class PublishWeeWX(StdService):
 
     def new_loop_packet(self, event):
         """ Handle loop packets. """
-        # Todo - if thread is not running, try to start it
-        if not self._thread.running:
-            raise weewx.StopNow("MQTT publishing thread has stopped.")
-
-        self.data_queue.put({'time_stamp': event.packet['dateTime'], 'type': 'loop', 'data': event.packet})
-        self._thread.threading_event.set()
+        self._handle_record(event.packet, 'loop')
 
     def new_archive_record(self, event):
         """ Handle archive records. """
+        self._handle_record(event.record, 'archive')
+
+    def _handle_record(self, data_type, data):
         # Todo - if thread is not running, try to start it
         if not self._thread.running:
-            raise weewx.StopNow()
-
-        self.data_queue.put({'time_stamp': event.record['dateTime'], 'type': 'archive', 'data': event.record})
-        self._thread.threading_event.set()
+            if 'threadEnded' in self.kill_weewx:
+                raise weewx.StopNow("MQTT publishing thread has stopped.")
+        else:
+            self.data_queue.put({'time_stamp': data['dateTime'], 'type': data_type, 'data': data})
+            self._thread.threading_event.set()        
 
     def shutDown(self): # need to override parent - pylint: disable=invalid-name
         """Run when an engine shutdown is requested."""
