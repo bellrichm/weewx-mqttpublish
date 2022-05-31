@@ -542,7 +542,8 @@ class MQTTPublish(object):
 class PublishWeeWX(StdService):
     """ A service to publish WeeWX loop and/or archive data to MQTT. """
     def __init__(self, engine, config_dict):
-        super(PublishWeeWX, self).__init__(engine, config_dict)
+        self.config_dict = config_dict
+        super(PublishWeeWX, self).__init__(engine, self.config_dict)
         self.publish_type = 'WeeWX'
 
         service_dict = config_dict.get('MQTTPublish', {}).get('PublishWeeWX', {})
@@ -554,6 +555,8 @@ class PublishWeeWX(StdService):
 
         # todo - make configurable
         self.kill_weewx = []
+        self.max_thread_restarts = 2
+        self.thread_restarts = 0
 
         # todo, tie this into the topic bindings somehow...
         binding = weeutil.weeutil.option_as_list(service_dict.get('binding', ['archive', 'loop']))
@@ -566,7 +569,7 @@ class PublishWeeWX(StdService):
         if 'archive' in binding:
             self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
 
-        self._thread = PublishWeeWXThread(config_dict, self.data_queue)
+        self._thread = PublishWeeWXThread(self.config_dict, self.data_queue)
         self.thread_start()
 
         logdbg(self.publish_type, "Threadid of PublishWeeWX is: %s" % gettid())
@@ -595,14 +598,19 @@ class PublishWeeWX(StdService):
         self._handle_record('archive', event.record)
 
     def _handle_record(self, data_type, data):
-        # Todo - if thread is not running, try to start it
         if not self._thread.running:
-            # self.thread_start()
-            if 'threadEnded' in self.kill_weewx:
+            if self.thread_restarts < self.max_thread_restarts:
+                self.thread_restarts += 1
+                self._thread = PublishWeeWXThread(self.config_dict, self.data_queue)
+                self.thread_start()
+
+                self.data_queue.put({'time_stamp': data['dateTime'], 'type': data_type, 'data': data})
+                self._thread.threading_event.set()
+            elif 'threadEnded' in self.kill_weewx:
                 raise weewx.StopNow("MQTT publishing thread has stopped.")
         else:
             self.data_queue.put({'time_stamp': data['dateTime'], 'type': data_type, 'data': data})
-            self._thread.threading_event.set()        
+            self._thread.threading_event.set()
 
     def shutDown(self): # need to override parent - pylint: disable=invalid-name
         """Run when an engine shutdown is requested."""
