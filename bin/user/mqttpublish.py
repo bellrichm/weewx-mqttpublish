@@ -583,22 +583,21 @@ class PublishWeeWX(StdService):
         if not self._thread.is_alive():
             loginf(self.publish_type, "oh no")
             raise weewx.WakeupError("Unable to start MQTT publishing thread.")
-        #loginf(self.publish_type, start_time)
-        #loginf(self.publish_type, end_time)
-        #loginf(self.publish_type, run_time)
+
         loginf(self.publish_type, "started thread")
 
     def new_loop_packet(self, event):
         """ Handle loop packets. """
-        self._handle_record(event.packet, 'loop')
+        self._handle_record('loop', event.packet)
 
     def new_archive_record(self, event):
         """ Handle archive records. """
-        self._handle_record(event.record, 'archive')
+        self._handle_record('archive', event.record)
 
     def _handle_record(self, data_type, data):
         # Todo - if thread is not running, try to start it
         if not self._thread.running:
+            # self.thread_start()
             if 'threadEnded' in self.kill_weewx:
                 raise weewx.StopNow("MQTT publishing thread has stopped.")
         else:
