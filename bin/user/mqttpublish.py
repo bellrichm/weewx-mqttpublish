@@ -1046,6 +1046,8 @@ class PublishWeeWXThread(AbstractPublishThread):
                 else:
                     logerr(self.publish_type, "Unknown data type, %s" % data_type)
             except Queue.Empty:
+                # todo this causes another connection, seems to cause no harm
+                # does cause a socket error/disconnect message on the server
                 self.mqtt_publish.client.loop(timeout=0.1)
                 # ToDo - investigate my 'sleep' implementation
                 self.threading_event.wait(self.keepalive/4)
