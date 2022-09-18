@@ -135,6 +135,22 @@ Configuration:
             # The unit system for data published to this topic.
             # The default is US.
             unit_system = US
+
+            # The aggregations to perform
+            [[[[[aggregates]]]]]
+                # The name of the observation in the MQTT payload.
+                # This can be any name. For example: rainSumDay, outTempMinHour, etc
+                [[[[[[aggregateObservationName]]]]]]
+                    # The WeeWX observation to aggregate, rain, outTemp, etc,
+                    observation =
+
+                    # The type of aggregation to perform.
+                    # See, https://www.weewx.com/docs/customizing.htm#aggregation_types
+                    aggregation = max
+
+                    # The time period over which the aggregation shoulf occurr.
+                    # Valid values: hour, day, week, month, year, yesterday, last24hours, last7days, last31days, last366days
+                    period =
 """
 # todo - rename table
 # todo - add option to keep x amount of records when 'cleaning'
