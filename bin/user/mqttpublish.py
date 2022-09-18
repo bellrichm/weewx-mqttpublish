@@ -236,6 +236,26 @@ schema = [ # confirm to standards pylint: disable=invalid-name
     ('data', 'STRING'),
     ]
 
+# need to rethink
+period_timespan = {
+    'hour': lambda time_stamp: weeutil.weeutil.archiveHoursAgoSpan(time_stamp),
+    'day': lambda time_stamp: weeutil.weeutil.archiveDaySpan(time_stamp),
+    'yesterday': lambda time_stamp: weeutil.weeutil.archiveDaySpan(time_stamp, 1, 1),
+    'week': lambda time_stamp: weeutil.weeutil.archiveWeekSpan(time_stamp),
+    'month': lambda time_stamp: weeutil.weeutil.archiveMonthSpan(time_stamp),
+    'year': lambda time_stamp: weeutil.weeutil.archiveYearSpan(time_stamp),
+    'last24hours': lambda time_stamp: TimeSpan(time_stamp, time_stamp - 86400),
+    'last7days': lambda time_stamp: TimeSpan(time_stamp,
+                                                time.mktime((datetime.date.fromtimestamp(time_stamp) - \
+                                                            datetime.timedelta(days=7)).timetuple())),
+    'last31days': lambda time_stamp: TimeSpan(time_stamp,
+                                                time.mktime((datetime.date.fromtimestamp(time_stamp) - \
+                                                            datetime.timedelta(days=31)).timetuple())),
+    'last366days': lambda time_stamp: TimeSpan(time_stamp,
+                                                time.mktime((datetime.date.fromtimestamp(time_stamp) - \
+                                                            datetime.timedelta(days=366)).timetuple()))
+}
+
 def gettid():
     """Get TID as displayed by htop.
        This is architecture dependent."""
@@ -699,6 +719,8 @@ class AbstractPublishThread(threading.Thread):
 
         self.publish_type = publish_type
 
+        self.db_manager = None
+
     def configure_fields(self, fields_dict, ignore, publish_none_value, append_unit_label, conversion_type, format_string):
         """ Configure the fields. """
         # pylint: disable=too-many-arguments
@@ -758,6 +780,9 @@ class AbstractPublishThread(threading.Thread):
 
             aggregates = topic_dict.get('aggregates', {})
             if aggregates:
+                for aggregate in aggregates:
+                    if aggregates[aggregate]['period'] not in period_timespan:
+                        raise ValueError("Invalid 'period', %s" % aggregates[aggregate]['period'])
                 weeutil.config.merge_config(aggregates, self.configure_fields(aggregates,
                                                                               ignore,
                                                                               publish_none_value,
@@ -827,40 +852,26 @@ class AbstractPublishThread(threading.Thread):
 
         for aggregate_observation in topic_dict['aggregates']:
             logdbg(self.publish_type, topic_dict['aggregates'][aggregate_observation])
-            # need to rethink
-            period_timespan = {
-                'hour': lambda time_stamp: weeutil.weeutil.archiveHoursAgoSpan(time_stamp),
-                'day': lambda time_stamp: weeutil.weeutil.archiveDaySpan(time_stamp),
-                'yesterday': lambda time_stamp: weeutil.weeutil.archiveDaySpan(time_stamp, 1, 1),
-                'week': lambda time_stamp: weeutil.weeutil.archiveWeekSpan(time_stamp),
-                'month': lambda time_stamp: weeutil.weeutil.archiveMonthSpan(time_stamp),
-                'year': lambda time_stamp: weeutil.weeutil.archiveYearSpan(time_stamp),
-                'last24hours': lambda time_stamp: TimeSpan(time_stamp, time_stamp - 86400),
-                'last7days': lambda time_stamp: TimeSpan(time_stamp,
-                                                         time.mktime((datetime.date.fromtimestamp(time_stamp) - \
-                                                                      datetime.timedelta(days=7)).timetuple())),
-                'last31days': lambda time_stamp: TimeSpan(time_stamp,
-                                                          time.mktime((datetime.date.fromtimestamp(time_stamp) - \
-                                                                       datetime.timedelta(days=31)).timetuple())),
-                'last366days': lambda time_stamp: TimeSpan(time_stamp,
-                                                           time.mktime((datetime.date.fromtimestamp(time_stamp) - \
-                                                                        datetime.timedelta(days=366)).timetuple()))
-                }
+
             time_span = period_timespan[topic_dict['aggregates'][aggregate_observation]['period']](record['dateTime'])
 
-            aggregate_value_tuple = weewx.xtypes.get_aggregate(topic_dict['aggregates'][aggregate_observation]['observation'],
-                                                               time_span, topic_dict['aggregates'][aggregate_observation]['type'],
-                                                               self.db_manager)
-            aggregate_value = weewx.units.convertStd(aggregate_value_tuple, record['usUnits'])[0]
+            try:
+                aggregate_value_tuple = weewx.xtypes.get_aggregate(topic_dict['aggregates'][aggregate_observation]['observation'],
+                                                                time_span, topic_dict['aggregates'][aggregate_observation]['aggregation'],
+                                                                self.db_manager)
+                aggregate_value = weewx.units.convertStd(aggregate_value_tuple, record['usUnits'])[0]
 
-            (name, value) = self.update_field(topic_dict, topic_dict['aggregates'][aggregate_observation],
-                                              aggregate_observation,
-                                              aggregate_value,
-                                              updated_record['usUnits'])
+                (name, value) = self.update_field(topic_dict, topic_dict['aggregates'][aggregate_observation],
+                                        aggregate_observation,
+                                        aggregate_value,
+                                        updated_record['usUnits'])
 
-            # ToDo: check if observation already in record
-            final_record[name] = value
+                # ToDo: check if observation already in record
+                final_record[name] = value
 
+            except (weewx.CannotCalculate, weewx.UnknownAggregation, weewx.UnknownType) as exception:
+                logerr(self.publish_type, "Aggregation failed: %s" % exception)
+                logerr(self.publish_type, traceback.format_exc())
 
         return final_record
 
@@ -1067,7 +1078,6 @@ class PublishWeeWXThread(AbstractPublishThread):
         logdbg(self.publish_type, "sanitized_service_dict is %s" % sanitized_service_dict)
 
         self.db_binder = weewx.manager.DBBinder(config_dict)
-        self.db_manager = None
 
         self.topics_loop, self.topics_archive = self.configure_topics(self.service_dict)
         self.wait_before_retry = float(self.service_dict.get('wait_before_retry', 2))
