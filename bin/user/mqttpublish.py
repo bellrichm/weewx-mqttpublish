@@ -135,6 +135,22 @@ Configuration:
             # The unit system for data published to this topic.
             # The default is US.
             unit_system = US
+
+            # The aggregations to perform
+            [[[[[aggregates]]]]]
+                # The name of the observation in the MQTT payload.
+                # This can be any name. For example: rainSumDay, outTempMinHour, etc
+                [[[[[[aggregateObservationName]]]]]]
+                    # The WeeWX observation to aggregate, rain, outTemp, etc,
+                    observation =
+
+                    # The type of aggregation to perform.
+                    # See, https://www.weewx.com/docs/customizing.htm#aggregation_types
+                    aggregation = max
+
+                    # The time period over which the aggregation shoulf occurr.
+                    # Valid values: hour, day, week, month, year, yesterday, last24hours, last7days, last31days, last366days
+                    period =
 """
 # todo - rename table
 # todo - add option to keep x amount of records when 'cleaning'
@@ -149,6 +165,7 @@ except ImportError:
     import Queue
 
 import argparse
+import datetime
 import json
 import os
 import random
@@ -161,7 +178,7 @@ import configobj
 
 import paho.mqtt.client as mqtt
 
-from weeutil.weeutil import to_bool, to_float, to_int
+from weeutil.weeutil import to_bool, to_float, to_int, TimeSpan
 
 import weedb
 import weewx
@@ -234,6 +251,26 @@ schema = [ # confirm to standards pylint: disable=invalid-name
     ('topic', 'STRING'),
     ('data', 'STRING'),
     ]
+
+# need to rethink
+period_timespan = {
+    'hour': lambda time_stamp: weeutil.weeutil.archiveHoursAgoSpan(time_stamp),
+    'day': lambda time_stamp: weeutil.weeutil.archiveDaySpan(time_stamp),
+    'yesterday': lambda time_stamp: weeutil.weeutil.archiveDaySpan(time_stamp, 1, 1),
+    'week': lambda time_stamp: weeutil.weeutil.archiveWeekSpan(time_stamp),
+    'month': lambda time_stamp: weeutil.weeutil.archiveMonthSpan(time_stamp),
+    'year': lambda time_stamp: weeutil.weeutil.archiveYearSpan(time_stamp),
+    'last24hours': lambda time_stamp: TimeSpan(time_stamp, time_stamp - 86400),
+    'last7days': lambda time_stamp: TimeSpan(time_stamp,
+                                                time.mktime((datetime.date.fromtimestamp(time_stamp) - \
+                                                            datetime.timedelta(days=7)).timetuple())),
+    'last31days': lambda time_stamp: TimeSpan(time_stamp,
+                                                time.mktime((datetime.date.fromtimestamp(time_stamp) - \
+                                                            datetime.timedelta(days=31)).timetuple())),
+    'last366days': lambda time_stamp: TimeSpan(time_stamp,
+                                                time.mktime((datetime.date.fromtimestamp(time_stamp) - \
+                                                            datetime.timedelta(days=366)).timetuple()))
+}
 
 def gettid():
     """Get TID as displayed by htop.
@@ -698,6 +735,8 @@ class AbstractPublishThread(threading.Thread):
 
         self.publish_type = publish_type
 
+        self.db_manager = None
+
     def configure_fields(self, fields_dict, ignore, publish_none_value, append_unit_label, conversion_type, format_string):
         """ Configure the fields. """
         # pylint: disable=too-many-arguments
@@ -705,7 +744,7 @@ class AbstractPublishThread(threading.Thread):
         for field in fields_dict.sections:
             fields[field] = {}
             field_dict = fields_dict.get(field, {})
-            fields[field]['name'] = field_dict.get('name', None)
+            fields[field]['name'] = field_dict.get('name', field)
             fields[field]['unit'] = field_dict.get('unit', None)
             fields[field]['ignore'] = to_bool(field_dict.get('ignore', ignore))
             fields[field]['publish_none_value'] = to_bool(field_dict.get('publish_none_value', publish_none_value))
@@ -755,6 +794,20 @@ class AbstractPublishThread(threading.Thread):
             if fields_dict is not None:
                 fields = self.configure_fields(fields_dict, ignore, publish_none_value, append_unit_label, conversion_type, format_string)
 
+            aggregates = topic_dict.get('aggregates', {})
+            if aggregates:
+                for aggregate in aggregates:
+                    if aggregates[aggregate]['period'] not in period_timespan:
+                        raise ValueError("Invalid 'period', %s" % aggregates[aggregate]['period'])
+                weeutil.config.merge_config(aggregates, self.configure_fields(aggregates,
+                                                                              ignore,
+                                                                              publish_none_value,
+                                                                              append_unit_label,
+                                                                              conversion_type,
+                                                                              format_string))
+
+            logdbg(self.publish_type, aggregates)
+
             if 'loop' in binding:
                 if not publish:
                     continue
@@ -771,6 +824,7 @@ class AbstractPublishThread(threading.Thread):
                 topics_loop[topic]['conversion_type'] = conversion_type
                 topics_loop[topic]['format'] = format_string
                 topics_loop[topic]['fields'] = dict(fields)
+                topics_loop[topic]['aggregates'] = dict(aggregates)
 
             if 'archive' in binding:
                 if not publish:
@@ -788,6 +842,7 @@ class AbstractPublishThread(threading.Thread):
                 topics_archive[topic]['conversion_type'] = conversion_type
                 topics_archive[topic]['format'] = format_string
                 topics_archive[topic]['fields'] = dict(fields)
+                topics_archive[topic]['aggregates'] = dict(aggregates)
 
         logdbg(self.publish_type, topics_loop)
         logdbg(self.publish_type, topics_archive)
@@ -810,6 +865,32 @@ class AbstractPublishThread(threading.Thread):
 
             (name, value) = self.update_field(topic_dict, fieldinfo, field, updated_record[field], updated_record['usUnits'])
             final_record[name] = value
+
+        for aggregate_observation in topic_dict['aggregates']:
+            logdbg(self.publish_type, topic_dict['aggregates'][aggregate_observation])
+
+            time_span = period_timespan[topic_dict['aggregates'][aggregate_observation]['period']](record['dateTime'])
+
+            try:
+                aggregate_value_tuple = weewx.xtypes.get_aggregate(topic_dict['aggregates'][aggregate_observation]['observation'],
+                                                                time_span, topic_dict['aggregates'][aggregate_observation]['aggregation'],
+                                                                self.db_manager)
+                aggregate_value = weewx.units.convertStd(aggregate_value_tuple, record['usUnits'])[0]
+                # ToDo: only do once?
+                weewx.units.obs_group_dict[aggregate_observation] = aggregate_value_tuple[2]
+
+                (name, value) = self.update_field(topic_dict, topic_dict['aggregates'][aggregate_observation],
+                                        aggregate_observation,
+                                        aggregate_value,
+                                        updated_record['usUnits'])
+
+                # ToDo: check if observation already in record
+                final_record[name] = value
+
+            except (weewx.CannotCalculate, weewx.UnknownAggregation, weewx.UnknownType) as exception:
+                logerr(self.publish_type, "Aggregation failed: %s" % exception)
+                logerr(self.publish_type, traceback.format_exc())
+
         return final_record
 
     @staticmethod
@@ -1029,6 +1110,8 @@ class PublishWeeWXThread(AbstractPublishThread):
     def run(self):
         self.running = True
         logdbg(self.publish_type, "Threadid of PublishWeeWXThread: %s" % gettid())
+
+        self.db_manager = self.db_binder.get_manager()
 
         # need to instantiate inside thread
         self.mqtt_publish = MQTTPublish(self, 'WeeWX', self.db_binder, self.service_dict)
