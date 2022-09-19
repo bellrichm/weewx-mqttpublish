@@ -780,9 +780,8 @@ class AbstractPublishThread(threading.Thread):
             retain = to_bool(topic_dict.get('retain', default_retain))
             data_type = topic_dict.get('type', default_type)
             binding = weeutil.weeutil.option_as_list(topic_dict.get('binding', default_binding))
-            unit_system_name = topic_dict.get('unit_system', service_dict.get('unit_system', None))
-            if  unit_system_name is not None:
-                unit_system = weewx.units.unit_constants[unit_system_name]
+            unit_system_name = topic_dict.get('unit_system', service_dict.get('unit_system', 'US'))
+            unit_system = weewx.units.unit_constants[unit_system_name]
 
             ignore = to_bool(topic_dict.get('ignore', False))
             publish_none_value = to_bool(topic_dict.get('publish_none_value', False))
