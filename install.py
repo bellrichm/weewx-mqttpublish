@@ -71,6 +71,6 @@ class MQTTPublishInstaller(ExtensionInstaller):
         mqttpublish_dict = configobj.ConfigObj(StringIO(MQTTPUBLISH_CONFIG))
         install_dict['config'] = mqttpublish_dict
         # ToDo: Better service group?
-        install_dict['restful_services'] = 'user.mqttpublish.MQTTPublish'
+        install_dict['restful_services'] = 'user.mqttpublish.PublishWeeWX'
 
         super(MQTTPublishInstaller, self).__init__(install_dict)
