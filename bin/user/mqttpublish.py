@@ -287,7 +287,7 @@ def gettid():
 
 class MQTTPublish(object):
     """ Managing publishing to MQTT. """
-    def __init__(self, publisher, publish_type, db_binder, service_dict):
+    def __init__(self, publisher, publish_type, mqtt_dbm, service_dict):
         self.connected = False
         self.mids = {}
         self.mqtt_logger = {
@@ -300,10 +300,10 @@ class MQTTPublish(object):
 
         self.publisher = publisher
         self.publish_type = publish_type
+        self.mqtt_dbm = mqtt_dbm
 
         self.max_retries = to_int(service_dict.get('max_retries', 5))
         self.retry_wait = to_int(service_dict.get('retry_wait', 5))
-        mqtt_binding = service_dict.get('mqtt_data_binding', 'mqtt_queue_binding')
         log_mqtt = to_bool(service_dict.get('log', False))
         self.host = service_dict.get('host', 'localhost')
         self.keepalive = to_int(service_dict.get('keepalive', 60))
@@ -340,15 +340,6 @@ class MQTTPublish(object):
 
         self._connect()
 
-        # ToDo: important to fix - pass dbm in 
-        self.mqtt_dbm = None
-        try:
-            self.mqtt_dbm = db_binder.get_manager(data_binding=mqtt_binding, initialize=True)
-            self.mqtt_dbm.getSql("PRAGMA journal_mode=WAL;")
-        except (weewx.UnknownBinding, weewx.UnknownDatabase) as exception:
-            logerr(self.publish_type, "Unable to get database mnager %s and reason %s." % (type(exception), exception))
-            logerr(self.publish_type, "%s" % traceback.format_exc())
-
     def _connect(self):
         try:
             self.client.connect(self.host, self.port, self.keepalive)
@@ -367,7 +358,6 @@ class MQTTPublish(object):
 
             retries += 1
             if retries > self.max_retries:
-                # self.shut_down()
                 # Shut thread down, a bit of a hack
                 self.publisher.running = False
                 return
@@ -392,7 +382,6 @@ class MQTTPublish(object):
 
             retries += 1
             if retries > self.max_retries:
-                # self.shut_down()
                 # Shut thread down, a bit of a hack
                 self.publisher.running = False
                 return
@@ -506,14 +495,6 @@ class MQTTPublish(object):
     def on_log(self, client, userdata, level, msg): # (match callback signature) pylint: disable=unused-argument
         """ The on_log callback. """
         self.mqtt_logger[level](self.publish_type, "MQTT log: %s" %msg)
-
-    def shut_down(self):
-        """ Shutting down. """
-        try:
-            self.mqtt_dbm.close()
-        except Exception as exception: # pylint: disable=broad-except
-            logerr(self.publish_type, "Close queue dbm failed %s" % exception)
-            logerr(self.publish_type, traceback.format_exc())
 
     def cleanup(self):
         """ Delete messages that were published on the first try.
@@ -1007,9 +988,16 @@ class PublishQueueThread(AbstractPublishThread):
         logdbg(self.publish_type, "Threadid of PublishQueueThread: %s" % gettid())
 
         self.dbm = self.db_binder.get_manager(data_binding=self.binding)
+        try:
+            self.mqtt_dbm = self.db_binder.get_manager(data_binding=self.mqtt_binding, initialize=True)
+            self.mqtt_dbm.getSql("PRAGMA journal_mode=WAL;")
+        except (weewx.UnknownBinding, weewx.UnknownDatabase) as exception:
+            logerr(self.publish_type, "Unable to get database mnager %s and reason %s." % (type(exception), exception))
+            logerr(self.publish_type, "%s" % traceback.format_exc())
+            # ToDo: shutdown
 
         # need to instantiate inside thread
-        self.mqtt_publish = MQTTPublish(self, 'Queue', self.db_binder, self.service_dict)
+        self.mqtt_publish = MQTTPublish(self, 'Queue', self.mqtt_dbm, self.service_dict)
 
         self.catchup()
 
@@ -1042,12 +1030,17 @@ class PublishQueueThread(AbstractPublishThread):
 
         loginf(self.publish_type, "exited loop")
         self.mqtt_publish.wait_for_inflight_messages()
-        self.mqtt_publish.shut_down()
 
         try:
             self.dbm.close()
         except Exception as exception: # pylint: disable=broad-except
             logerr(self.publish_type, "Close queue dbm failed %s" % exception)
+            logerr(self.publish_type, traceback.format_exc())
+
+        try:
+            self.mqtt_dbm.close()
+        except Exception as exception: # pylint: disable=broad-except
+            logerr(self.publish_type, "Close mqtt dbm failed %s" % exception)
             logerr(self.publish_type, traceback.format_exc())
 
         self.db_binder.close()
@@ -1119,7 +1112,7 @@ class PublishWeeWXThread(AbstractPublishThread):
         self.db_manager = self.db_binder.get_manager()
 
         # need to instantiate inside thread
-        self.mqtt_publish = MQTTPublish(self, 'WeeWX', self.db_binder, self.service_dict)
+        self.mqtt_publish = MQTTPublish(self, 'WeeWX', None, self.service_dict)
 
         while self.running:
             try:
@@ -1143,7 +1136,6 @@ class PublishWeeWXThread(AbstractPublishThread):
 
         loginf(self.publish_type, "exited loop")
         self.mqtt_publish.wait_for_inflight_messages()
-        self.mqtt_publish.shut_down()
 
         self.db_binder.close()
 
