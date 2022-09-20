@@ -340,6 +340,7 @@ class MQTTPublish(object):
 
         self._connect()
 
+        # ToDo: important to fix
         self.mqtt_dbm = db_binder.get_manager(data_binding=mqtt_binding, initialize=True)
         self.mqtt_dbm.getSql("PRAGMA journal_mode=WAL;")
 
@@ -752,7 +753,7 @@ class AbstractPublishThread(threading.Thread):
             fields[field]['conversion_type'] = field_dict.get('conversion_type', conversion_type)
             fields[field]['format_string'] = field_dict.get('format_string', format_string)
 
-        logdbg(self.publish_type, fields)
+        logdbg(self.publish_type, "Configured fields: %s" % fields)
         return fields
 
     def configure_topics(self, service_dict):
@@ -805,7 +806,7 @@ class AbstractPublishThread(threading.Thread):
                                                                               conversion_type,
                                                                               format_string))
 
-            logdbg(self.publish_type, aggregates)
+            logdbg(self.publish_type, "Configured aggregates: %s" % aggregates)
 
             if 'loop' in binding:
                 if not publish:
@@ -843,8 +844,8 @@ class AbstractPublishThread(threading.Thread):
                 topics_archive[topic]['fields'] = dict(fields)
                 topics_archive[topic]['aggregates'] = dict(aggregates)
 
-        logdbg(self.publish_type, topics_loop)
-        logdbg(self.publish_type, topics_archive)
+        logdbg(self.publish_type, "Loop topics: %s" % topics_loop)
+        logdbg(self.publish_type, "Archive topics: %s" % topics_archive)
         return topics_loop, topics_archive
 
     def update_record(self, topic_dict, record):
@@ -866,7 +867,7 @@ class AbstractPublishThread(threading.Thread):
             final_record[name] = value
 
         for aggregate_observation in topic_dict['aggregates']:
-            logdbg(self.publish_type, topic_dict['aggregates'][aggregate_observation])
+            # logdbg(self.publish_type, topic_dict['aggregates'][aggregate_observation])
 
             time_span = period_timespan[topic_dict['aggregates'][aggregate_observation]['period']](record['dateTime'])
 
