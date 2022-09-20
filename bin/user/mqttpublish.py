@@ -805,6 +805,8 @@ class AbstractPublishThread(threading.Thread):
                 topics_loop[topic]['guarantee_delivery'] = to_bool(topic_dict.get('guarantee_delivery', False))
                 if topics_loop[topic]['guarantee_delivery'] and topics_loop[topic]['qos'] == 0:
                     raise ValueError("QOS must be greater than 0 to guarantee delivery.")
+                if topics_loop[topic]['guarantee_delivery'] and self.publish_type == 'WeeWX':
+                    raise ValueError("guarantee delivery is not valid for PublishWeeWX")
                 topics_loop[topic]['ignore'] = ignore
                 topics_loop[topic]['append_unit_label'] = append_unit_label
                 topics_loop[topic]['conversion_type'] = conversion_type
@@ -823,6 +825,8 @@ class AbstractPublishThread(threading.Thread):
                 topics_archive[topic]['guarantee_delivery'] = to_bool(topic_dict.get('guarantee_delivery', False))
                 if topics_archive[topic]['guarantee_delivery'] and topics_archive[topic]['qos'] == 0:
                     raise ValueError("QOS must be greater than 0 to guarantee delivery.")
+                if topics_archive[topic]['guarantee_delivery'] and self.publish_type == 'WeeWX':
+                    raise ValueError("guarantee delivery is not valid for PublishWeeWX")
                 topics_archive[topic]['ignore'] = ignore
                 topics_archive[topic]['append_unit_label'] = append_unit_label
                 topics_archive[topic]['conversion_type'] = conversion_type
@@ -982,6 +986,7 @@ class PublishQueueThread(AbstractPublishThread):
         self.db_binder = weewx.manager.DBBinder(config_dict)
 
         self.dbm = None
+        self.mqtt_dbm = None
 
     def run(self):
         self.running = True
