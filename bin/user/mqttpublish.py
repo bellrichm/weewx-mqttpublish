@@ -114,6 +114,26 @@ Configuration:
         # Default is None.
         password = None
 
+        [[[lwt]]]
+            # The topic that the will message should be published on.
+            # Default is 'status'.
+            topic = 'status'
+
+            # Default is 'online'.
+            online_payload ='online'
+
+            # The message to send as a will.
+            # Default is 'offline'.
+            offline_payload = offline
+
+            # he quality of service level to use for the will.
+            # Default is 0
+            qos = 0
+
+            # If set to true, the will message will be set as the "last known good"/retained message for the topic.
+            # The default is True.
+            retain = True
+
         [[[Topics]]]
             [[[[first/topic]]]]
             # Controls if the topic is published.
@@ -338,6 +358,13 @@ class MQTTPublish(object):
         if tls_dict:
             self.config_tls(tls_dict)
 
+        self.lwt_dict = service_dict.get('lwt')
+        if self.lwt_dict:
+            self.client.will_set(topic=self.lwt_dict.get('topic', 'status'),
+                                 payload=self.lwt_dict.get('offline_payload', 'offline'),
+                                 qos=self.lwt_dict.get('qos', 0),
+                                 retain=self.lwt_dict.get('retain', True))
+
         self._connect()
 
     def _connect(self):
@@ -459,6 +486,11 @@ class MQTTPublish(object):
         # 6-255: Currently unused.
         loginf(self.publish_type, "Connected with result code %i, %s" %(rc, mqtt.error_string(rc)))
         loginf(self.publish_type, "Connected flags %s" %str(flags))
+        if self.lwt_dict:
+            self.client.publish(topic=self.lwt_dict.get('topic', 'ststus'),
+                                 payload=self.lwt_dict.get('online_payload', 'online'),
+                                 qos=self.lwt_dict.get('qos', 0),
+                                 retain=self.lwt_dict.get('retain', True))
         self.connected = True
 
     def on_disconnect(self, client, userdata, rc):  # (match callback signature) pylint: disable=unused-argument
