@@ -340,9 +340,14 @@ class MQTTPublish(object):
 
         self._connect()
 
-        # ToDo: important to fix
-        self.mqtt_dbm = db_binder.get_manager(data_binding=mqtt_binding, initialize=True)
-        self.mqtt_dbm.getSql("PRAGMA journal_mode=WAL;")
+        # ToDo: important to fix - pass dbm in 
+        self.mqtt_dbm = None
+        try:
+            self.mqtt_dbm = db_binder.get_manager(data_binding=mqtt_binding, initialize=True)
+            self.mqtt_dbm.getSql("PRAGMA journal_mode=WAL;")
+        except (weewx.UnknownBinding, weewx.UnknownDatabase) as exception:
+            logerr(self.publish_type, "Unable to get database mnager %s and reason %s." % (type(exception), exception))
+            logerr(self.publish_type, "%s" % traceback.format_exc())
 
     def _connect(self):
         try:
