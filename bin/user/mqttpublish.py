@@ -771,7 +771,7 @@ class AbstractPublishThread(threading.Thread):
             fields[field]['conversion_type'] = field_dict.get('conversion_type', conversion_type)
             fields[field]['format_string'] = field_dict.get('format_string', format_string)
 
-        logdbg(self.publish_type, "Configured fields: %s" % fields)
+        #logdbg(self.publish_type, "Configured fields: %s" % fields)
         return fields
 
     def configure_topics(self, service_dict):
@@ -824,7 +824,7 @@ class AbstractPublishThread(threading.Thread):
                                                                               conversion_type,
                                                                               format_string))
 
-            logdbg(self.publish_type, "Configured aggregates: %s" % aggregates)
+            #logdbg(self.publish_type, "Configured aggregates: %s" % aggregates)
 
             if 'loop' in binding:
                 if not publish:
