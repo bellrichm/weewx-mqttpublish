@@ -204,7 +204,7 @@ import weedb
 import weewx
 from weewx.engine import StdService
 
-VERSION = "0.2.0-rc01"
+VERSION = "0.2.0-rc02a"
 
 try:
     # Test for new-style weewx logging by trying to import weeutil.logger
