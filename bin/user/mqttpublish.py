@@ -487,7 +487,7 @@ class MQTTPublish(object):
         loginf(self.publish_type, "Connected with result code %i, %s" %(rc, mqtt.error_string(rc)))
         loginf(self.publish_type, "Connected flags %s" %str(flags))
         if self.lwt_dict:
-            self.client.publish(topic=self.lwt_dict.get('topic', 'ststus'),
+            self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
                                  payload=self.lwt_dict.get('online_payload', 'online'),
                                  qos=to_int(self.lwt_dict.get('qos', 0)),
                                  retain=to_bool(self.lwt_dict.get('retain', True)))
