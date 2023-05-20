@@ -500,7 +500,10 @@ class MQTTPublish(object):
         # If MQTT_ERR_SUCCESS (0), the callback was called in response to a disconnect() call.
         # If any other value the disconnection was unexpected,
         # such as might be caused by a network error.
-        loginf(self.publish_type, "Disconnected with result code %i, %s" %(rc, mqtt.error_string(rc)))
+        if rc == 0:
+            loginf(self.publish_type, "Disconnected with result code %i, %s" %(rc, mqtt.error_string(rc)))
+        else:
+            logerr(self.publish_type, "Disconnected with result code %i, %s" %(rc, mqtt.error_string(rc)))
 
         # As of 1.6.1, Paho MQTT cannot have a callback invoke a second callback. So we won't attempt to reconnect here.
         # Because that would cause the on_connect callback to be called. Instead we will just mark as not connected.
