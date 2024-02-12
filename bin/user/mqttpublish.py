@@ -344,7 +344,12 @@ class MQTTPublish(object):
             loginf(self.publish_type, "password is not set")
             loginf(self.publish_type, "clientid is %s" % clientid)
 
-        self.client = mqtt.Client(clientid)
+        try:
+            callback_api_version = mqtt.CallbackAPIVersion.VERSION1
+            self.client = mqtt.Client(callback_api_version=callback_api_version, # (only available in v2) pylint: disable=unexpected-keyword-arg
+                                    client_id=clientid)
+        except AttributeError:
+            self.client = mqtt.Client(client_id=clientid) # (v1 signature) pylint: disable=no-value-for-parameter
 
         if log_mqtt:
             self.client.on_log = self.on_log
