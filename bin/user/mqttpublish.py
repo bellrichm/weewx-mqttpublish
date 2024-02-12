@@ -296,8 +296,10 @@ def gettid():
     """Get TID as displayed by htop.
        This is architecture dependent."""
     import ctypes #  need to be python 2 compatible, Want to keep this piece of code self contained. pylint: disable=bad-option-value, import-outside-toplevel
+    from ctypes.util import find_library
     # pylint: enable=bad-option-value
-    libc = 'libc.so.6'
+    libc = ctypes.CDLL(find_library('c'))
+
     for cmd in (186, 224, 178):
         tid = ctypes.CDLL(libc).syscall(cmd)
         if tid != -1:
@@ -631,7 +633,7 @@ class PublishWeeWX(StdService):
         self._thread = PublishWeeWXThread(self.config_dict, self.data_queue)
         self.thread_start()
 
-        logdbg(self.publish_type, "Threadid of PublishWeeWX is: %s" % gettid())
+        #logdbg(self.publish_type, "Threadid of PublishWeeWX is: %s" % gettid())
 
     def thread_start(self):
         loginf(self.publish_type, "starting thread")
@@ -700,7 +702,7 @@ class PublishQueue(StdService):
         self._thread = PublishQueueThread(config_dict)
         self.thread_start()
 
-        logdbg(self.publish_type, "Threadid of PublishQueue is: %s" % gettid())
+        #logdbg(self.publish_type, "Threadid of PublishQueue is: %s" % gettid())
 
         # Todo, check that thread is alive
         # not sure what event to use, probably new_archive_record
@@ -1025,7 +1027,7 @@ class PublishQueueThread(AbstractPublishThread):
 
     def run(self):
         self.running = True
-        logdbg(self.publish_type, "Threadid of PublishQueueThread: %s" % gettid())
+        #logdbg(self.publish_type, "Threadid of PublishQueueThread: %s" % gettid())
 
         self.dbm = self.db_binder.get_manager(data_binding=self.binding)
         try:
@@ -1147,7 +1149,7 @@ class PublishWeeWXThread(AbstractPublishThread):
 
     def run(self):
         self.running = True
-        logdbg(self.publish_type, "Threadid of PublishWeeWXThread: %s" % gettid())
+        #logdbg(self.publish_type, "Threadid of PublishWeeWXThread: %s" % gettid())
 
         self.db_manager = self.db_binder.get_manager()
 
