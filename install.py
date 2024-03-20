@@ -15,7 +15,7 @@ except ImportError:
 
 from weecfg.extension import ExtensionInstaller
 
-VERSION = "0.2.0-rc02a"
+VERSION = "0.3.0"
 
 MQTTPUBLISH_CONFIG = """
 [MQTTPublish]
