@@ -383,7 +383,7 @@ class MQTTPublish(object):
         if hasattr(mqtt, 'CallbackAPIVersion'):
             protocol_string = service_dict.get('protocol', 'MQTTv311')
             protocol = getattr(mqtt, protocol_string, 0)
-            if protocol not in [mqtt.MQTTv31, mqtt.MQTTv311]:
+            if protocol in [mqtt.MQTTv31, mqtt.MQTTv311]:
                 return MQTTPublishV2MQTT3(publisher, publish_type, mqtt_dbm, service_dict)
 
             return MQTTPublishV2(publisher, publish_type, mqtt_dbm, service_dict)
@@ -392,7 +392,7 @@ class MQTTPublish(object):
 
     def _connect(self):
         try:
-            self.client.connect(self.host, self.port, self.keepalive)
+            self.connect(self.host, self.port, self.keepalive)
         except Exception as exception: # (want to catch all) pylint: disable=broad-except
             logerr(self.publish_type, "MQTT connect failed with %s and reason %s." % (type(exception), exception))
             logerr(self.publish_type, "%s" % traceback.format_exc())
@@ -413,7 +413,7 @@ class MQTTPublish(object):
                 return
 
             try:
-                self.client.connect(self.host, self.port, self.keepalive)
+                self.connect(self.host, self.port, self.keepalive)
             except Exception as exception: # (want to catch all) pylint: disable=broad-except
                 logerr(self.publish_type, "MQTT connect failed with %s and reason %s." % (type(exception), exception))
                 logerr(self.publish_type, "%s" % traceback.format_exc())
@@ -570,6 +570,10 @@ class MQTTPublish(object):
     def set_callbacks(self, log_mqtt):
         ''' Setup the MQTT callbacks. '''
         raise NotImplementedError("Method 'set_callbacks' is not implemented")
+    
+    def connect(self, host, port, keepalive):
+        ''' Connect to the MQTT server. '''
+        raise NotImplementedError("Method 'connect' is not implemented")
 
 class MQTTPublishV1(MQTTPublish):
     ''' MQTTPublish that communicates with paho mqtt v1.'''
@@ -593,6 +597,10 @@ class MQTTPublishV1(MQTTPublish):
         self.client.on_connect = self.on_connect
         self.client.on_disconnect = self.on_disconnect
         self.client.on_publish = self.on_publish
+
+    def connect(self, host, port, keepalive):
+        ''' Connect to the MQTT server. '''
+        self.client.connect(host, port, keepalive)
 
     def on_log(self, _client, _userdata, level, msg):
         """ The on_log callback. """
@@ -652,13 +660,14 @@ class MQTTPublishV1(MQTTPublish):
                 "UPDATE archive SET pub_dateTime = ? WHERE dateTime == ? and mid == ? and pub_dateTime is NULL;",
                 [time.time(), time_stamp, mid])
 
-class MQTTPublishV2(MQTTPublish):
+class MQTTPublishV2MQTT3(MQTTPublish):
     ''' MQTTPublish that communicates with paho mqtt v2. '''
     def get_client(self, client_id, protocol):
         ''' Get the MQTT client. '''
         return mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, # (only available in v2) pylint: disable=unexpected-keyword-arg
-                               protocol=protocol,
-                                client_id=client_id)
+                            protocol=protocol,
+                            client_id=client_id,
+                            clean_session=True)
       
     def set_callbacks(self, log_mqtt):
         ''' Setup the MQTT callbacks. '''
@@ -668,6 +677,10 @@ class MQTTPublishV2(MQTTPublish):
         self.client.on_connect = self.on_connect
         self.client.on_disconnect = self.on_disconnect
         self.client.on_publish = self.on_publish
+
+    def connect(self, host, port, keepalive):
+        ''' Connect to the MQTT server. '''
+        self.client.connect(host, port, keepalive)
 
     def on_log(self, _client, _userdata, level, msg):
         """ The on_log callback. """
@@ -719,7 +732,7 @@ class MQTTPublishV2(MQTTPublish):
                 "UPDATE archive SET pub_dateTime = ? WHERE dateTime == ? and mid == ? and pub_dateTime is NULL;",
                 [time.time(), time_stamp, mid])
 
-class MQTTPublishV2MQTT3(MQTTPublish):
+class MQTTPublishV2(MQTTPublish):
     ''' MQTTPublish that communicates with paho mqtt v2 and mqtt v3. '''
     def get_client(self, client_id, protocol):
        ''' Get the MQTT client. '''
