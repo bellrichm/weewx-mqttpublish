@@ -359,13 +359,7 @@ class MQTTPublish(object):
             loginf(self.publish_type, "clientid is %s" % clientid)
 
         self.client = self.get_client(clientid, self.protocol)
-
-        if log_mqtt:
-            self.client.on_log = self.on_log
-
-        self.client.on_connect = self.on_connect
-        self.client.on_disconnect = self.on_disconnect
-        self.client.on_publish = self.on_publish
+        self.set_callbacks(log_mqtt)
 
         if username is not None and password is not None:
             self.client.username_pw_set(username, password)
@@ -502,64 +496,6 @@ class MQTTPublish(object):
                             tls_version=tls_version,
                             ciphers=tls_dict.get('ciphers'))
 
-    def on_connect(self, client, userdata, flags, rc):  # (match callback signature) pylint: disable=unused-argument
-        """ The on_connect callback. """
-        # https://pypi.org/project/paho-mqtt/#on-connect
-        # rc:
-        # 0: Connection successful
-        # 1: Connection refused - incorrect protocol version
-        # 2: Connection refused - invalid client identifier
-        # 3: Connection refused - server unavailable
-        # 4: Connection refused - bad username or password
-        # 5: Connection refused - not authorised
-        # 6-255: Currently unused.
-        loginf(self.publish_type, "Connected with result code %i, %s" %(rc, mqtt.error_string(rc)))
-        loginf(self.publish_type, "Connected flags %s" %str(flags))
-        if self.lwt_dict:
-            self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
-                                 payload=self.lwt_dict.get('online_payload', 'online'),
-                                 qos=to_int(self.lwt_dict.get('qos', 0)),
-                                 retain=to_bool(self.lwt_dict.get('retain', True)))
-        self.connected = True
-
-    def on_disconnect(self, client, userdata, rc):  # (match callback signature) pylint: disable=unused-argument
-        """ The on_connect callback. """
-        # https://pypi.org/project/paho-mqtt/#on-discconnect
-        # The rc parameter indicates the disconnection state.
-        # If MQTT_ERR_SUCCESS (0), the callback was called in response to a disconnect() call.
-        # If any other value the disconnection was unexpected,
-        # such as might be caused by a network error.
-        if rc == 0:
-            loginf(self.publish_type, "Disconnected with result code %i, %s" %(rc, mqtt.error_string(rc)))
-        else:
-            logerr(self.publish_type, "Disconnected with result code %i, %s" %(rc, mqtt.error_string(rc)))
-
-        # As of 1.6.1, Paho MQTT cannot have a callback invoke a second callback. So we won't attempt to reconnect here.
-        # Because that would cause the on_connect callback to be called. Instead we will just mark as not connected.
-        # And check the flag before attempting to publish.
-        self.connected = False
-
-    def on_publish(self, client, userdata, mid):  # (match callback signature) pylint: disable=unused-argument
-        """ The on_publish callback. """
-        time_stamp = "          "
-        qos = ""
-        guarantee_delivery = False
-        if mid in self.mids:
-            time_stamp = self.mids[mid]['time_stamp']
-            qos = self.mids[mid]['qos']
-            guarantee_delivery = self.mids[mid]['guarantee_delivery']
-            del self.mids[mid]
-        logdbg(self.publish_type, "Published  (%s): %s %s %s" % (int(time.time()), time_stamp, mid, qos))
-        logdbg(self.publish_type, "Inflight   (%s): %s" % (int(time.time()), self.mids))
-        if guarantee_delivery:
-            self.mqtt_dbm.getSql( \
-                "UPDATE archive SET pub_dateTime = ? WHERE dateTime == ? and mid == ? and pub_dateTime is NULL;",
-                [time.time(), time_stamp, mid])
-
-    def on_log(self, client, userdata, level, msg): # (match callback signature) pylint: disable=unused-argument
-        """ The on_log callback. """
-        self.mqtt_logger[level](self.publish_type, "MQTT log: %s" %msg)
-
     def cleanup(self):
         """ Delete messages that were published on the first try.
             Messages that had to be republished are left for root cause analysis. """
@@ -630,6 +566,10 @@ class MQTTPublish(object):
     def get_client(self, client_id, protocol):
         ''' Get the MQTT client. '''
         raise NotImplementedError("Method 'get_client' is not implemented")
+    
+    def set_callbacks(self, log_mqtt):
+        ''' Setup the MQTT callbacks. '''
+        raise NotImplementedError("Method 'set_callbacks' is not implemented")
 
 class MQTTPublishV1(MQTTPublish):
     ''' MQTTPublish that communicates with paho mqtt v1.'''
@@ -643,15 +583,141 @@ class MQTTPublishV1(MQTTPublish):
 
     def get_client(self, client_id, protocol):
         ''' Get the MQTT client. '''
-        return mqtt.Client(client_id=client_id, protocol=protocol) # (v1 signature) pylint: disable=no-value-for-parameter        
+        return mqtt.Client(client_id=client_id, protocol=protocol) # (v1 signature) pylint: disable=no-value-for-parameter
+      
+    def set_callbacks(self, log_mqtt):
+        ''' Setup the MQTT callbacks. '''
+        if log_mqtt:
+            self.client.on_log = self.on_log
+
+        self.client.on_connect = self.on_connect
+        self.client.on_disconnect = self.on_disconnect
+        self.client.on_publish = self.on_publish
+
+    def on_log(self, _client, _userdata, level, msg):
+        """ The on_log callback. """
+        self.mqtt_logger[level](self.publish_type, "MQTT log: %s" %msg)
+
+    def on_connect(self, client, userdata, flags, rc):
+        """ The on_connect callback. """
+        # https://pypi.org/project/paho-mqtt/#on-connect
+        # rc:
+        # 0: Connection successful
+        # 1: Connection refused - incorrect protocol version
+        # 2: Connection refused - invalid client identifier
+        # 3: Connection refused - server unavailable
+        # 4: Connection refused - bad username or password
+        # 5: Connection refused - not authorised
+        # 6-255: Currently unused.
+        loginf(self.publish_type, "Connected with result code %i, %s" %(rc, mqtt.error_string(rc)))
+        loginf(self.publish_type, "Connected flags %s" %str(flags))
+        if self.lwt_dict:
+            self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
+                                 payload=self.lwt_dict.get('online_payload', 'online'),
+                                 qos=to_int(self.lwt_dict.get('qos', 0)),
+                                 retain=to_bool(self.lwt_dict.get('retain', True)))
+        self.connected = True
+
+    def on_disconnect(self, _client, _userdata, rc):
+        """ The on_connect callback. """
+        # https://pypi.org/project/paho-mqtt/#on-discconnect
+        # The rc parameter indicates the disconnection state.
+        # If MQTT_ERR_SUCCESS (0), the callback was called in response to a disconnect() call.
+        # If any other value the disconnection was unexpected,
+        # such as might be caused by a network error.
+        if rc == 0:
+            loginf(self.publish_type, "Disconnected with result code %i, %s" %(rc, mqtt.error_string(rc)))
+        else:
+            logerr(self.publish_type, "Disconnected with result code %i, %s" %(rc, mqtt.error_string(rc)))
+
+        # As of 1.6.1, Paho MQTT cannot have a callback invoke a second callback. So we won't attempt to reconnect here.
+        # Because that would cause the on_connect callback to be called. Instead we will just mark as not connected.
+        # And check the flag before attempting to publish.
+        self.connected = False
+
+    def on_publish(self, _client, _userdata, mid):
+        """ The on_publish callback. """
+        time_stamp = "          "
+        qos = ""
+        guarantee_delivery = False
+        if mid in self.mids:
+            time_stamp = self.mids[mid]['time_stamp']
+            qos = self.mids[mid]['qos']
+            guarantee_delivery = self.mids[mid]['guarantee_delivery']
+            del self.mids[mid]
+        logdbg(self.publish_type, "Published  (%s): %s %s %s" % (int(time.time()), time_stamp, mid, qos))
+        logdbg(self.publish_type, "Inflight   (%s): %s" % (int(time.time()), self.mids))
+        if guarantee_delivery:
+            self.mqtt_dbm.getSql( \
+                "UPDATE archive SET pub_dateTime = ? WHERE dateTime == ? and mid == ? and pub_dateTime is NULL;",
+                [time.time(), time_stamp, mid])
 
 class MQTTPublishV2(MQTTPublish):
     ''' MQTTPublish that communicates with paho mqtt v2. '''
     def get_client(self, client_id, protocol):
         ''' Get the MQTT client. '''
-        return mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION1, # (only available in v2) pylint: disable=unexpected-keyword-arg
+        return mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, # (only available in v2) pylint: disable=unexpected-keyword-arg
                                protocol=protocol,
-                                client_id=client_id)        
+                                client_id=client_id)
+      
+    def set_callbacks(self, log_mqtt):
+        ''' Setup the MQTT callbacks. '''
+        if log_mqtt:
+            self.client.on_log = self.on_log
+
+        self.client.on_connect = self.on_connect
+        self.client.on_disconnect = self.on_disconnect
+        self.client.on_publish = self.on_publish
+
+    def on_log(self, _client, _userdata, level, msg):
+        """ The on_log callback. """
+        self.mqtt_logger[level](self.publish_type, "MQTT log: %s" %msg)
+    
+    def on_connect(self, _client, _userdata, flags, reason_code, _properties):
+        """ The on_connect callback. """
+        loginf(self.publish_type, "Connected with result code %i" % int(reason_code.value))
+        loginf(self.publish_type, "Connected flags %s" %str(flags))
+        if self.lwt_dict:
+            self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
+                                 payload=self.lwt_dict.get('online_payload', 'online'),
+                                 qos=to_int(self.lwt_dict.get('qos', 0)),
+                                 retain=to_bool(self.lwt_dict.get('retain', True)))
+        self.connected = True
+        
+    def on_disconnect(self, _client, _userdata, _flags, reason_code, _properties):
+        """ The on_disconnect callback. """
+        # https://pypi.org/project/paho-mqtt/#on-discconnect
+        # The rc parameter indicates the disconnection state.
+        # If MQTT_ERR_SUCCESS (0), the callback was called in response to a disconnect() call.
+        # If any other value the disconnection was unexpected,
+        # such as might be caused by a network error.
+        if int(reason_code.value) == 0:
+            loginf(self.publish_type, "Disconnected with result code %i" % int(reason_code.value))
+        else:
+            logerr(self.publish_type, "Disconnected with result code %i" % int(reason_code.value))
+
+        # ToDo: research how it works with v2
+        # As of 1.6.1, Paho MQTT cannot have a callback invoke a second callback. So we won't attempt to reconnect here.
+        # Because that would cause the on_connect callback to be called. Instead we will just mark as not connected.
+        # And check the flag before attempting to publish.
+        self.connected = False
+
+    def on_publish(self, _client, _userdata, mid, _reason_codes, _properties):
+        """ The on_publish callback. """
+        time_stamp = "          "
+        qos = ""
+        guarantee_delivery = False
+        if mid in self.mids:
+            time_stamp = self.mids[mid]['time_stamp']
+            qos = self.mids[mid]['qos']
+            guarantee_delivery = self.mids[mid]['guarantee_delivery']
+            del self.mids[mid]
+        logdbg(self.publish_type, "Published  (%s): %s %s %s" % (int(time.time()), time_stamp, mid, qos))
+        logdbg(self.publish_type, "Inflight   (%s): %s" % (int(time.time()), self.mids))
+        if guarantee_delivery:
+            self.mqtt_dbm.getSql( \
+                "UPDATE archive SET pub_dateTime = ? WHERE dateTime == ? and mid == ? and pub_dateTime is NULL;",
+                [time.time(), time_stamp, mid])
 
 class MQTTPublishV2MQTT3(MQTTPublish):
     ''' MQTTPublish that communicates with paho mqtt v2 and mqtt v3. '''
