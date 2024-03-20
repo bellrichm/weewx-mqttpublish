@@ -386,21 +386,15 @@ class MQTTPublish(object):
     @classmethod
     def get_publish(cls, publisher, publish_type, mqtt_dbm, service_dict):
         ''' Factory method to get appropriate MQTTPublish for paho mqtt version. '''
-        return MQTTPublish(publisher, publish_type, mqtt_dbm, service_dict)
-        
-    def get_client(self, client_id, protocol):
-        ''' Get the MQTT client. '''
-        if protocol not in [mqtt.MQTTv31, mqtt.MQTTv311]:
-            raise ValueError(f"Invalid protocol, {protocol}.")
-        
-        try:
-            callback_api_version = mqtt.CallbackAPIVersion.VERSION1
-            client = mqtt.Client(callback_api_version=callback_api_version, # (only available in v2) pylint: disable=unexpected-keyword-arg
-                                    client_id=client_id)
-        except AttributeError:
-            client = mqtt.Client(client_id=client_id) # (v1 signature) pylint: disable=no-value-for-parameter
+        if hasattr(mqtt, 'CallbackAPIVersion'):
+            protocol_string = service_dict.get('protocol', 'MQTTv311')
+            protocol = getattr(mqtt, protocol_string, 0)
+            if protocol not in [mqtt.MQTTv31, mqtt.MQTTv311]:
+                return MQTTPublishV2MQTT3(publisher, publish_type, mqtt_dbm, service_dict)
 
-        return client
+            return MQTTPublishV2(publisher, publish_type, mqtt_dbm, service_dict)
+
+        return MQTTPublishV1(publisher, publish_type, mqtt_dbm, service_dict)
 
     def _connect(self):
         try:
@@ -633,6 +627,40 @@ class MQTTPublish(object):
         max_time = time.time() - 24 * 60 * 60
         self.mqtt_dbm.getSql("Delete from archive where pub_dateTime is null and proc_dateTime  < ?", [max_time])
 
+    def get_client(self, client_id, protocol):
+        ''' Get the MQTT client. '''
+        raise NotImplementedError("Method 'get_client' is not implemented")
+
+class MQTTPublishV1(MQTTPublish):
+    ''' MQTTPublish that communicates with paho mqtt v1.'''
+    def __init__(self, publisher, publish_type, mqtt_dbm, service_dict):
+        protocol_string = service_dict.get('protocol', 'MQTTv311')
+        protocol = getattr(mqtt, protocol_string, 0)
+        if protocol not in [mqtt.MQTTv31, mqtt.MQTTv311]:
+            raise ValueError(f"Invalid protocol, {protocol_string}.")
+
+        super().__init__(publisher, publish_type, mqtt_dbm, service_dict)
+
+    def get_client(self, client_id, protocol):
+        ''' Get the MQTT client. '''
+        return mqtt.Client(client_id=client_id, protocol=protocol) # (v1 signature) pylint: disable=no-value-for-parameter        
+
+class MQTTPublishV2(MQTTPublish):
+    ''' MQTTPublish that communicates with paho mqtt v2. '''
+    def get_client(self, client_id, protocol):
+        ''' Get the MQTT client. '''
+        return mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION1, # (only available in v2) pylint: disable=unexpected-keyword-arg
+                               protocol=protocol,
+                                client_id=client_id)        
+
+class MQTTPublishV2MQTT3(MQTTPublish):
+    ''' MQTTPublish that communicates with paho mqtt v2 and mqtt v3. '''
+    def get_client(self, client_id, protocol):
+       ''' Get the MQTT client. '''
+       return mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, # (only available in v2) pylint: disable=unexpected-keyword-arg
+                          protocol=protocol,
+                          client_id=client_id)
+    
 class PublishWeeWX(StdService):
     """ A service to publish WeeWX loop and/or archive data to MQTT. """
     def __init__(self, engine, config_dict):
