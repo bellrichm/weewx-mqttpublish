@@ -38,6 +38,11 @@ Configuration:
         # Default is 1883.
         port = 1883
 
+        # The protocol to use
+        # Valid values: MQTTv31, MQTTv311
+        # Default is MQTTv311,
+        protocol = MQTTv311
+
         # Maximum period in seconds allowed between communications with the broker.
         # Default is 60.
         keepalive = 60
@@ -101,6 +106,11 @@ Configuration:
         # The port to connect to.
         # Default is 1883.
         port = 1883
+
+        # The protocol to use
+        # Valid values: MQTTv31, MQTTv311
+        # Default is MQTTv311,
+        protocol = MQTTv311
 
         # Maximum period in seconds allowed between communications with the broker.
         # Default is 60.
@@ -334,9 +344,13 @@ class MQTTPublish(object):
         password = service_dict.get('password', None)
         clientid = service_dict.get('clientid', 'MQTTPublish-' + str(random.randint(1000, 9999)))
 
+        protocol_string = service_dict.get('protocol', 'MQTTv311')
+        self.protocol = getattr(mqtt, protocol_string, 0)
+
         loginf(self.publish_type, "host is %s" % self.host)
         loginf(self.publish_type, "port is %s" % self.port)
         loginf(self.publish_type, "keepalive is %s" % self.keepalive)
+        loginf(self.publish_type, "protocol is %s" % self.protocol)
         loginf(self.publish_type, "username is %s" % username)
         if password is not None:
             loginf(self.publish_type, "password is set")
@@ -344,12 +358,7 @@ class MQTTPublish(object):
             loginf(self.publish_type, "password is not set")
             loginf(self.publish_type, "clientid is %s" % clientid)
 
-        try:
-            callback_api_version = mqtt.CallbackAPIVersion.VERSION1
-            self.client = mqtt.Client(callback_api_version=callback_api_version, # (only available in v2) pylint: disable=unexpected-keyword-arg
-                                    client_id=clientid)
-        except AttributeError:
-            self.client = mqtt.Client(client_id=clientid) # (v1 signature) pylint: disable=no-value-for-parameter
+        self.client = self.get_client(clientid, self.protocol)
 
         if log_mqtt:
             self.client.on_log = self.on_log
@@ -373,6 +382,25 @@ class MQTTPublish(object):
                                  retain=to_bool(self.lwt_dict.get('retain', True)))
 
         self._connect()
+
+    @classmethod
+    def get_publish(cls, publisher, publish_type, mqtt_dbm, service_dict):
+        ''' Factory method to get appropriate MQTTPublish for paho mqtt version. '''
+        return MQTTPublish(publisher, publish_type, mqtt_dbm, service_dict)
+        
+    def get_client(self, client_id, protocol):
+        ''' Get the MQTT client. '''
+        if protocol not in [mqtt.MQTTv31, mqtt.MQTTv311]:
+            raise ValueError(f"Invalid protocol, {protocol}.")
+        
+        try:
+            callback_api_version = mqtt.CallbackAPIVersion.VERSION1
+            client = mqtt.Client(callback_api_version=callback_api_version, # (only available in v2) pylint: disable=unexpected-keyword-arg
+                                    client_id=client_id)
+        except AttributeError:
+            client = mqtt.Client(client_id=client_id) # (v1 signature) pylint: disable=no-value-for-parameter
+
+        return client
 
     def _connect(self):
         try:
@@ -1044,7 +1072,7 @@ class PublishQueueThread(AbstractPublishThread):
             # ToDo: shutdown
 
         # need to instantiate inside thread
-        self.mqtt_publish = MQTTPublish(self, 'Queue', self.mqtt_dbm, self.service_dict)
+        self.mqtt_publish = MQTTPublish.get_publish(self, 'Queue', self.mqtt_dbm, self.service_dict)
 
         self.catchup()
 
@@ -1159,7 +1187,7 @@ class PublishWeeWXThread(AbstractPublishThread):
         self.db_manager = self.db_binder.get_manager()
 
         # need to instantiate inside thread
-        self.mqtt_publish = MQTTPublish(self, 'WeeWX', None, self.service_dict)
+        self.mqtt_publish = MQTTPublish.get_publish(self, 'WeeWX', None, self.service_dict)
 
         while self.running:
             try:
@@ -1222,7 +1250,7 @@ if __name__ == "__main__":
         db_binder = weewx.manager.DBBinder(config_dict)
 
         service_dict = config_dict.get('PublishQueue', {})
-        mqtt_publish = MQTTPublish(None, '     ', db_binder, service_dict)
+        mqtt_publish = MQTTPublish.get_publish(None, '     ', db_binder, service_dict)
         if options.clean:
             mqtt_publish.cleanup()
 
