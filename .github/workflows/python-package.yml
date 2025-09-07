@@ -1,0 +1,60 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python package
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  LATEST_PYTHON_VERSION: 3.13
+  LATEST_WEEWX_VERSION: 5.1.0
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14.0-rc.2"]
+        weewx-version: ["5.0.0", "5.1.0"]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install coverage configobj flake8 mock pytest pytest-html weewx==${{ matrix.weewx-version }}
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 --tee --output-file=results/flake8.txt bin/user --exclude tests --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 --tee --output-file=results/flake8.txt bin/user --exclude tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Test with pytest
+      run: |
+        export PYTHONPATH=bin:$PYTHONPATH
+        pytest bin/user/tests/unit --html=results/unittests.html --self-contained-html
+        pytest bin/user/tests/func --html=results/functests.html --self-contained-html
+    # Temporarily do not run code coverage, because currently there is none
+    #- name: Code Coverage
+    # Only run code coverage once, against the latest python version and weewx version
+    #  if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
+    #  run: |
+    #    export PYTHONPATH=bin:$PYTHONPATH
+    #    coverage run --branch -m pytest bin/user/tests/unit
+    #    coverage html --include bin/user/aqitype.py -d results/coverage
+    - name: Archive test-results
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-${{ matrix.python-version }}-${{ matrix.weewx-version }}
+        path: results
