@@ -254,7 +254,7 @@ except ImportError:
     def logmsg(level, name, msg):
         """ Log the message at the designated level. """
         # Replace '__name__' with something to identify your application.
-        syslog.syslog(level, '__name__: %s: (%s)' % (name, msg))
+        syslog.syslog(level, f'__name__: {name}: ({msg})')
 
     def logdbg(name, msg):
         """ Log debug level. """
@@ -347,16 +347,16 @@ class MQTTPublish(object):
         protocol_string = service_dict.get('protocol', 'MQTTv311')
         self.protocol = getattr(mqtt, protocol_string, 0)
 
-        loginf(self.publish_type, "host is %s" % self.host)
-        loginf(self.publish_type, "port is %s" % self.port)
-        loginf(self.publish_type, "keepalive is %s" % self.keepalive)
-        loginf(self.publish_type, "protocol is %s" % self.protocol)
-        loginf(self.publish_type, "username is %s" % username)
+        loginf(self.publish_type, f"host is {self.host}")
+        loginf(self.publish_type, f"port is {self.port}")
+        loginf(self.publish_type, f"keepalive is {self.keepalive}")
+        loginf(self.publish_type, f"protocol is {self.protocol}")
+        loginf(self.publish_type, f"username is {username}")
         if password is not None:
             loginf(self.publish_type, "password is set")
         else:
             loginf(self.publish_type, "password is not set")
-            loginf(self.publish_type, "clientid is %s" % clientid)
+            loginf(self.publish_type, f"clientid is {clientid}")
 
         self.client = self.get_client(clientid, self.protocol)
         self.set_callbacks(log_mqtt)
@@ -394,8 +394,8 @@ class MQTTPublish(object):
         try:
             self.connect(self.host, self.port, self.keepalive)
         except Exception as exception: # (want to catch all) pylint: disable=broad-except
-            logerr(self.publish_type, "MQTT connect failed with %s and reason %s." % (type(exception), exception))
-            logerr(self.publish_type, "%s" % traceback.format_exc())
+            logerr(self.publish_type, f"MQTT connect failed with {type(exception)} and reason {exception}.")
+            logerr(self.publish_type, f"{traceback.format_exc()}")
         retries = 0
         # loop seems to break before connect, perhaps due to logging
         self.client.loop(timeout=0.1)
@@ -415,8 +415,8 @@ class MQTTPublish(object):
             try:
                 self.connect(self.host, self.port, self.keepalive)
             except Exception as exception: # (want to catch all) pylint: disable=broad-except
-                logerr(self.publish_type, "MQTT connect failed with %s and reason %s." % (type(exception), exception))
-                logerr(self.publish_type, "%s" % traceback.format_exc())
+                logerr(self.publish_type, f"MQTT connect failed with {type(exception)} and reason {exception}.")
+                logerr(self.publish_type, f"{traceback.format_exc()}")
 
     def _reconnect(self):
         logdbg(self.publish_type, "*** Before reconnect ***")
@@ -483,11 +483,11 @@ class MQTTPublish(object):
 
         valid_cert_reqs = valid_cert_reqs.get(tls_dict.get('certs_required', 'required'))
         if valid_cert_reqs is None:
-            raise ValueError("Invalid 'certs_required'., %s" % tls_dict['certs_required'])
+            raise ValueError(f"Invalid 'certs_required'., {tls_dict['certs_required']}")
 
         tls_version = valid_tls_versions.get(tls_dict.get('tls_version', 'tlsv12'))
         if tls_version is None:
-            raise ValueError("Invalid 'tls_version'., %s" % tls_dict['tls_version'])
+            raise ValueError(f"Invalid 'tls_version'., {tls_dict['tls_version']}")
 
         self.client.tls_set(ca_certs=ca_certs,
                             certfile=tls_dict.get('certfile'),
@@ -511,7 +511,7 @@ class MQTTPublish(object):
         if not self.connected:
             self._reconnect()
         mqtt_message_info = self.client.publish(topic, data, qos=qos, retain=retain)
-        logdbg(self.publish_type, "Publishing (%s): %s %s %s %s" % (int(time.time()), int(time_stamp), mqtt_message_info.mid, qos, topic))
+        logdbg(self.publish_type, f"Publishing ({int(time.time())}): {int(time_stamp)} {mqtt_message_info.mid} {qos} {topic}")
         if guarantee_delivery:
             self.mids[mqtt_message_info.mid] = {}
             self.mids[mqtt_message_info.mid]['time_stamp'] = time_stamp
@@ -530,7 +530,7 @@ class MQTTPublish(object):
         counter = 0
         sleepy = 2
         while len(self.mids) > 0 and counter < wait_count:
-            logdbg(self.publish_type, "() %s in flight messages; on %s loop count %s" %(len(self.mids), counter, self.mids))
+            logdbg(self.publish_type, f"() {len(self.mids)} in flight messages; on {counter} loop count {self.mids}")
             self.client.loop(timeout=0.1)
             time.sleep(sleepy)
             counter += 1
@@ -604,7 +604,7 @@ class MQTTPublishV1(MQTTPublish):
 
     def on_log(self, _client, _userdata, level, msg):
         """ The on_log callback. """
-        self.mqtt_logger[level](self.publish_type, "MQTT log: %s" %msg)
+        self.mqtt_logger[level](self.publish_type, f"MQTT log: {msg}")
 
     def on_connect(self, _client, _userdata, flags, rc):
         """ The on_connect callback. """
@@ -618,7 +618,7 @@ class MQTTPublishV1(MQTTPublish):
         # 5: Connection refused - not authorised
         # 6-255: Currently unused.
         loginf(self.publish_type, "Connected with result code %i, %s" %(rc, mqtt.error_string(rc)))
-        loginf(self.publish_type, "Connected flags %s" %str(flags))
+        loginf(self.publish_type, f"Connected flags {str(flags)}")
         if self.lwt_dict:
             self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
                                  payload=self.lwt_dict.get('online_payload', 'online'),
@@ -653,8 +653,8 @@ class MQTTPublishV1(MQTTPublish):
             qos = self.mids[mid]['qos']
             guarantee_delivery = self.mids[mid]['guarantee_delivery']
             del self.mids[mid]
-        logdbg(self.publish_type, "Published  (%s): %s %s %s" % (int(time.time()), time_stamp, mid, qos))
-        logdbg(self.publish_type, "Inflight   (%s): %s" % (int(time.time()), self.mids))
+        logdbg(self.publish_type, f"Published  ({int(time.time())}): {time_stamp} {mid} {qos}")
+        logdbg(self.publish_type, f"Inflight   ({int(time.time())}): {self.mids}")
         if guarantee_delivery:
             self.mqtt_dbm.getSql( \
                 "UPDATE archive SET pub_dateTime = ? WHERE dateTime == ? and mid == ? and pub_dateTime is NULL;",
@@ -684,12 +684,12 @@ class MQTTPublishV2MQTT3(MQTTPublish):
 
     def on_log(self, _client, _userdata, level, msg):
         """ The on_log callback. """
-        self.mqtt_logger[level](self.publish_type, "MQTT log: %s" %msg)
+        self.mqtt_logger[level](self.publish_type, f"MQTT log: {msg}")
 
     def on_connect(self, _client, _userdata, flags, reason_code, _properties):
         """ The on_connect callback. """
         loginf(self.publish_type, "Connected with result code %i" % int(reason_code.value))
-        loginf(self.publish_type, "Connected flags %s" %str(flags))
+        loginf(self.publish_type, f"Connected flags {str(flags)}")
         if self.lwt_dict:
             self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
                                  payload=self.lwt_dict.get('online_payload', 'online'),
@@ -725,8 +725,8 @@ class MQTTPublishV2MQTT3(MQTTPublish):
             qos = self.mids[mid]['qos']
             guarantee_delivery = self.mids[mid]['guarantee_delivery']
             del self.mids[mid]
-        logdbg(self.publish_type, "Published  (%s): %s %s %s" % (int(time.time()), time_stamp, mid, qos))
-        logdbg(self.publish_type, "Inflight   (%s): %s" % (int(time.time()), self.mids))
+        logdbg(self.publish_type, f"Published  ({int(time.time())}): {time_stamp} {mid} {qos}")
+        logdbg(self.publish_type, f"Inflight   ({int(time.time())}): {self.mids}")
         if guarantee_delivery:
             self.mqtt_dbm.getSql( \
                 "UPDATE archive SET pub_dateTime = ? WHERE dateTime == ? and mid == ? and pub_dateTime is NULL;",
@@ -755,12 +755,12 @@ class MQTTPublishV2(MQTTPublish):
 
     def on_log(self, _client, _userdata, level, msg):
         """ The on_log callback. """
-        self.mqtt_logger[level](self.publish_type, "MQTT log: %s" %msg)
+        self.mqtt_logger[level](self.publish_type, f"MQTT log: {msg}")
 
     def on_connect(self, _client, _userdata, flags, reason_code, _properties):
         """ The on_connect callback. """
         loginf(self.publish_type, "Connected with result code %i" % int(reason_code.value))
-        loginf(self.publish_type, "Connected flags %s" %str(flags))
+        loginf(self.publish_type, f"Connected flags {str(flags)}")
         if self.lwt_dict:
             self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
                                  payload=self.lwt_dict.get('online_payload', 'online'),
@@ -796,8 +796,8 @@ class MQTTPublishV2(MQTTPublish):
             qos = self.mids[mid]['qos']
             guarantee_delivery = self.mids[mid]['guarantee_delivery']
             del self.mids[mid]
-        logdbg(self.publish_type, "Published  (%s): %s %s %s" % (int(time.time()), time_stamp, mid, qos))
-        logdbg(self.publish_type, "Inflight   (%s): %s" % (int(time.time()), self.mids))
+        logdbg(self.publish_type, f"Published  ({int(time.time())}): {time_stamp} {mid} {qos}")
+        logdbg(self.publish_type, f"Inflight   ({int(time.time())}): {self.mids}")
         if guarantee_delivery:
             self.mqtt_dbm.getSql( \
                 "UPDATE archive SET pub_dateTime = ? WHERE dateTime == ? and mid == ? and pub_dateTime is NULL;",
@@ -885,7 +885,7 @@ class PublishWeeWX(StdService):
             self._thread.threading_event.set()
             self._thread.join(20.0)
             if self._thread.is_alive():
-                logerr(self.publish_type, "Unable to shut down %s thread" %self._thread.name)
+                logerr(self.publish_type, f"Unable to shut down {self._thread.name} thread")
 
             self._thread = None
 
@@ -930,7 +930,7 @@ class PublishQueue(StdService):
             self._thread.threading_event.set()
             self._thread.join(20.0)
             if self._thread.is_alive():
-                logerr(self.publish_type, "Unable to shut down %s thread" % self._thread.name)
+                logerr(self.publish_type, f"Unable to shut down {self._thread.name} thread")
 
                 self._thread = None
 
@@ -1024,7 +1024,7 @@ class AbstractPublishThread(threading.Thread):
             if aggregates:
                 for aggregate in aggregates:
                     if aggregates[aggregate]['period'] not in period_timespan:
-                        raise ValueError("Invalid 'period', %s" % aggregates[aggregate]['period'])
+                        raise ValueError(f"Invalid 'period', {aggregates[aggregate]['period']}")
                 weeutil.config.merge_config(aggregates, self.configure_fields(aggregates,
                                                                               ignore,
                                                                               publish_none_value,
@@ -1074,8 +1074,8 @@ class AbstractPublishThread(threading.Thread):
                 topics_archive[topic]['fields'] = dict(fields)
                 topics_archive[topic]['aggregates'] = dict(aggregates)
 
-        logdbg(self.publish_type, "Loop topics: %s" % topics_loop)
-        logdbg(self.publish_type, "Archive topics: %s" % topics_archive)
+        logdbg(self.publish_type, f"Loop topics: {topics_loop}")
+        logdbg(self.publish_type, f"Archive topics: {topics_archive}")
         return topics_loop, topics_archive
 
     def update_record(self, topic_dict, record):
@@ -1118,7 +1118,7 @@ class AbstractPublishThread(threading.Thread):
                 final_record[name] = value
 
             except (weewx.CannotCalculate, weewx.UnknownAggregation, weewx.UnknownType) as exception:
-                logerr(self.publish_type, "Aggregation failed: %s" % exception)
+                logerr(self.publish_type, f"Aggregation failed: {exception}")
                 logerr(self.publish_type, traceback.format_exc())
 
         return final_record
@@ -1133,7 +1133,7 @@ class AbstractPublishThread(threading.Thread):
             (unit_type, _) = weewx.units.getStandardUnitType(unit_system, name)
             unit_type = AbstractPublishThread.UNIT_REDUCTIONS.get(unit_type, unit_type)
             if unit_type is not None:
-                name = "%s_%s" % (name, unit_type)
+                name = f"{name}_{unit_type}"
 
         unit = fieldinfo.get('unit', None)
         if unit is not None:
@@ -1170,7 +1170,7 @@ class AbstractPublishThread(threading.Thread):
                                                   json.dumps(updated_record))
             if topics[topic]['type'] == 'keyword':
                 updated_record = self.update_record(topics[topic], record)
-                data_keyword = ', '.join("%s=%s" % (key, val) for (key, val) in updated_record.items())
+                data_keyword = ', '.join(f"{key}={val}" for (key, val) in updated_record.items())
                 self.mqtt_publish.publish_message(time_stamp,
                                                   0,
                                                   topics[topic]['guarantee_delivery'],
@@ -1199,8 +1199,8 @@ class PublishQueueThread(AbstractPublishThread):
 
         exclude_keys = ['password']
         sanitized_service_dict = {k: self.service_dict[k] for k in set(list(self.service_dict.keys())) - set(exclude_keys)}
-        logdbg(self.publish_type, "sanitized configuration removed %s" % exclude_keys)
-        logdbg(self.publish_type, "sanitized_service_dict is %s" % sanitized_service_dict)
+        logdbg(self.publish_type, f"sanitized configuration removed {exclude_keys}")
+        logdbg(self.publish_type, f"sanitized_service_dict is {sanitized_service_dict}")
 
         self.binding = self.service_dict.get('data_binding', 'ext_queue_binding')
         self.mqtt_binding = self.service_dict.get('mqtt_data_binding', 'mqtt_queue_binding')
@@ -1212,8 +1212,8 @@ class PublishQueueThread(AbstractPublishThread):
         self.publish_interval = int(self.service_dict.get('publish_interval', 0))
         self.publish_delay = int(self.service_dict.get('publish_delay', 0))
 
-        loginf(self.publish_type, "External queue data binding is  %s" % self.binding)
-        loginf(self.publish_type, "MQTT queue data binding is  %s" % self.mqtt_binding)
+        loginf(self.publish_type, f"External queue data binding is  {self.binding}")
+        loginf(self.publish_type, f"MQTT queue data binding is  {self.mqtt_binding}")
         loginf(self.publish_type, "Wait before retry is %i" % self.wait_before_retry)
         loginf(self.publish_type, "Publish interval is %i" % self.publish_interval)
         loginf(self.publish_type, "Publish delay is %i" % self.publish_delay)
@@ -1237,8 +1237,8 @@ class PublishQueueThread(AbstractPublishThread):
             self.mqtt_dbm = self.db_binder.get_manager(data_binding=self.mqtt_binding, initialize=True)
             self.mqtt_dbm.getSql("PRAGMA journal_mode=WAL;")
         except (weewx.UnknownBinding, weewx.UnknownDatabase) as exception:
-            logerr(self.publish_type, "Unable to get database mnager %s and reason %s." % (type(exception), exception))
-            logerr(self.publish_type, "%s" % traceback.format_exc())
+            logerr(self.publish_type, f"Unable to get database mnager {type(exception)} and reason {exception}.")
+            logerr(self.publish_type, f"{traceback.format_exc()}")
             # ToDo: shutdown
 
         # need to instantiate inside thread
@@ -1256,7 +1256,7 @@ class PublishQueueThread(AbstractPublishThread):
                 elif data_type == 'archive':
                     self.publish_row(time_stamp, json.loads(data), self.topics_archive)
                 else:
-                    logerr(self.publish_type, "Unknown data type, %s" % data_type)
+                    logerr(self.publish_type, f"Unknown data type, {data_type}")
             else:
                 if self.publish_interval:
                     archive_start = weeutil.weeutil.startOfInterval(time.time(), self.publish_interval)
@@ -1268,7 +1268,7 @@ class PublishQueueThread(AbstractPublishThread):
                 if time_sleep > self.keepalive:
                     time_sleep = self.keepalive/4
 
-                logdbg(self.publish_type, "Sleeping   (%s): %s" %(int(time.time()), time_sleep))
+                logdbg(self.publish_type, f"Sleeping   ({int(time.time())}): {time_sleep}")
                 self.threading_event.wait(time_sleep)
                 self.threading_event.clear()
                 self.mqtt_publish.client.loop(timeout=0.1)
@@ -1279,13 +1279,13 @@ class PublishQueueThread(AbstractPublishThread):
         try:
             self.dbm.close()
         except Exception as exception: # pylint: disable=broad-except
-            logerr(self.publish_type, "Close queue dbm failed %s" % exception)
+            logerr(self.publish_type, f"Close queue dbm failed {exception}")
             logerr(self.publish_type, traceback.format_exc())
 
         try:
             self.mqtt_dbm.close()
         except Exception as exception: # pylint: disable=broad-except
-            logerr(self.publish_type, "Close mqtt dbm failed %s" % exception)
+            logerr(self.publish_type, f"Close mqtt dbm failed {exception}")
             logerr(self.publish_type, traceback.format_exc())
 
         self.db_binder.close()
@@ -1335,8 +1335,8 @@ class PublishWeeWXThread(AbstractPublishThread):
 
         exclude_keys = ['password']
         sanitized_service_dict = {k: self.service_dict[k] for k in set(list(self.service_dict.keys())) - set(exclude_keys)}
-        logdbg(self.publish_type, "sanitized configuration removed %s" % exclude_keys)
-        logdbg(self.publish_type, "sanitized_service_dict is %s" % sanitized_service_dict)
+        logdbg(self.publish_type, f"sanitized configuration removed {exclude_keys}")
+        logdbg(self.publish_type, f"sanitized_service_dict is {sanitized_service_dict}")
 
         self.db_binder = weewx.manager.DBBinder(config_dict)
 
@@ -1370,7 +1370,7 @@ class PublishWeeWXThread(AbstractPublishThread):
                 elif data_type == 'archive':
                     self.publish_row(time_stamp, data, self.topics_archive)
                 else:
-                    logerr(self.publish_type, "Unknown data type, %s" % data_type)
+                    logerr(self.publish_type, f"Unknown data type, {data_type}")
             except Queue.Empty:
                 # todo this causes another connection, seems to cause no harm
                 # does cause a socket error/disconnect message on the server
