@@ -566,11 +566,11 @@ class MQTTPublish(object):
     def get_client(self, client_id, protocol):
         ''' Get the MQTT client. '''
         raise NotImplementedError("Method 'get_client' is not implemented")
-    
+
     def set_callbacks(self, log_mqtt):
         ''' Setup the MQTT callbacks. '''
         raise NotImplementedError("Method 'set_callbacks' is not implemented")
-    
+
     def connect(self, host, port, keepalive):
         ''' Connect to the MQTT server. '''
         raise NotImplementedError("Method 'connect' is not implemented")
@@ -588,7 +588,7 @@ class MQTTPublishV1(MQTTPublish):
     def get_client(self, client_id, protocol):
         ''' Get the MQTT client. '''
         return mqtt.Client(client_id=client_id, protocol=protocol) # (v1 signature) pylint: disable=no-value-for-parameter
-      
+
     def set_callbacks(self, log_mqtt):
         ''' Setup the MQTT callbacks. '''
         if log_mqtt:
@@ -606,7 +606,7 @@ class MQTTPublishV1(MQTTPublish):
         """ The on_log callback. """
         self.mqtt_logger[level](self.publish_type, "MQTT log: %s" %msg)
 
-    def on_connect(self, client, userdata, flags, rc):
+    def on_connect(self, _client, _userdata, flags, rc):
         """ The on_connect callback. """
         # https://pypi.org/project/paho-mqtt/#on-connect
         # rc:
@@ -668,7 +668,7 @@ class MQTTPublishV2MQTT3(MQTTPublish):
                             protocol=protocol,
                             client_id=client_id,
                             clean_session=True)
-      
+
     def set_callbacks(self, log_mqtt):
         ''' Setup the MQTT callbacks. '''
         if log_mqtt:
@@ -685,7 +685,7 @@ class MQTTPublishV2MQTT3(MQTTPublish):
     def on_log(self, _client, _userdata, level, msg):
         """ The on_log callback. """
         self.mqtt_logger[level](self.publish_type, "MQTT log: %s" %msg)
-    
+
     def on_connect(self, _client, _userdata, flags, reason_code, _properties):
         """ The on_connect callback. """
         loginf(self.publish_type, "Connected with result code %i" % int(reason_code.value))
@@ -696,7 +696,7 @@ class MQTTPublishV2MQTT3(MQTTPublish):
                                  qos=to_int(self.lwt_dict.get('qos', 0)),
                                  retain=to_bool(self.lwt_dict.get('retain', True)))
         self.connected = True
-        
+
     def on_disconnect(self, _client, _userdata, _flags, reason_code, _properties):
         """ The on_disconnect callback. """
         # https://pypi.org/project/paho-mqtt/#on-discconnect
@@ -739,7 +739,7 @@ class MQTTPublishV2(MQTTPublish):
         return mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, # (only available in v2) pylint: disable=unexpected-keyword-arg
                             protocol=protocol,
                             client_id=client_id)
-      
+
     def set_callbacks(self, log_mqtt):
         ''' Setup the MQTT callbacks. '''
         if log_mqtt:
@@ -756,7 +756,7 @@ class MQTTPublishV2(MQTTPublish):
     def on_log(self, _client, _userdata, level, msg):
         """ The on_log callback. """
         self.mqtt_logger[level](self.publish_type, "MQTT log: %s" %msg)
-    
+
     def on_connect(self, _client, _userdata, flags, reason_code, _properties):
         """ The on_connect callback. """
         loginf(self.publish_type, "Connected with result code %i" % int(reason_code.value))
@@ -767,7 +767,7 @@ class MQTTPublishV2(MQTTPublish):
                                  qos=to_int(self.lwt_dict.get('qos', 0)),
                                  retain=to_bool(self.lwt_dict.get('retain', True)))
         self.connected = True
-        
+
     def on_disconnect(self, _client, _userdata, _flags, reason_code, _properties):
         """ The on_disconnect callback. """
         # https://pypi.org/project/paho-mqtt/#on-discconnect
