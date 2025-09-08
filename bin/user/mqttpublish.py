@@ -286,7 +286,7 @@ schema = [ # confirm to standards pylint: disable=invalid-name
 period_timespan = {
     'hour': lambda time_stamp: weeutil.weeutil.archiveHoursAgoSpan(time_stamp),
     'day': lambda time_stamp: weeutil.weeutil.archiveDaySpan(time_stamp),
-    'yesterday': lambda time_stamp: weeutil.weeutil.archiveDaySpan(time_stamp, 1, 1),
+    'yesterday': lambda time_stamp: weeutil.weeutil.archiveDaySpan(time_stamp, 1),
     'week': lambda time_stamp: weeutil.weeutil.archiveWeekSpan(time_stamp),
     'month': lambda time_stamp: weeutil.weeutil.archiveMonthSpan(time_stamp),
     'year': lambda time_stamp: weeutil.weeutil.archiveYearSpan(time_stamp),
@@ -839,6 +839,7 @@ class PublishWeeWX(StdService):
         #logdbg(self.publish_type, "Threadid of PublishWeeWX is: %s" % gettid())
 
     def thread_start(self):
+        """Start the publishing thread."""
         loginf(self.publish_type, "starting thread")
         self._thread.start()
         # ToDo - configure how long to wait for thread to start
@@ -911,6 +912,7 @@ class PublishQueue(StdService):
         # not sure what event to use, probably new_archive_record
 
     def thread_start(self):
+        """Start the publishing thread."""
         self._thread.start()
         # ToDo - configure how long to wait for thread to start
         self.thread_start_wait = 10.0
