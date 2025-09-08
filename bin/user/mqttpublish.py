@@ -551,7 +551,7 @@ class MQTTPublish(object):
                 self.mqtt_dbm.getSql("UPDATE archive SET pub_dateTime = 0 WHERE dateTime = ? and mid == ?;", [time_stamp, mid])
 
                 i += 1
-                logdbg(self.publish_type, "republish %i  of %i" % (i, len(rows)))
+                logdbg(self.publish_type, f"republish {int(i)}  of {len(rows)}")
 
             self.wait_for_inflight_messages()
 
@@ -617,7 +617,7 @@ class MQTTPublishV1(MQTTPublish):
         # 4: Connection refused - bad username or password
         # 5: Connection refused - not authorised
         # 6-255: Currently unused.
-        loginf(self.publish_type, "Connected with result code %i, %s" %(rc, mqtt.error_string(rc)))
+        loginf(self.publish_type, f"Connected with result code {int(rc)}, {mqtt.error_string(rc)}")
         loginf(self.publish_type, f"Connected flags {str(flags)}")
         if self.lwt_dict:
             self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
@@ -634,9 +634,9 @@ class MQTTPublishV1(MQTTPublish):
         # If any other value the disconnection was unexpected,
         # such as might be caused by a network error.
         if rc == 0:
-            loginf(self.publish_type, "Disconnected with result code %i, %s" %(rc, mqtt.error_string(rc)))
+            loginf(self.publish_type, f"Disconnected with result code {int(rc)}, {mqtt.error_string(rc)}")
         else:
-            logerr(self.publish_type, "Disconnected with result code %i, %s" %(rc, mqtt.error_string(rc)))
+            logerr(self.publish_type, f"Disconnected with result code {int(rc)}, {mqtt.error_string(rc)}")
 
         # As of 1.6.1, Paho MQTT cannot have a callback invoke a second callback. So we won't attempt to reconnect here.
         # Because that would cause the on_connect callback to be called. Instead we will just mark as not connected.
@@ -688,7 +688,7 @@ class MQTTPublishV2MQTT3(MQTTPublish):
 
     def on_connect(self, _client, _userdata, flags, reason_code, _properties):
         """ The on_connect callback. """
-        loginf(self.publish_type, "Connected with result code %i" % int(reason_code.value))
+        loginf(self.publish_type, f"Connected with result code {int(int(reason_code.value))}")
         loginf(self.publish_type, f"Connected flags {str(flags)}")
         if self.lwt_dict:
             self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
@@ -705,9 +705,9 @@ class MQTTPublishV2MQTT3(MQTTPublish):
         # If any other value the disconnection was unexpected,
         # such as might be caused by a network error.
         if int(reason_code.value) == 0:
-            loginf(self.publish_type, "Disconnected with result code %i" % int(reason_code.value))
+            loginf(self.publish_type, f"Disconnected with result code {int(int(reason_code.value))}")
         else:
-            logerr(self.publish_type, "Disconnected with result code %i" % int(reason_code.value))
+            logerr(self.publish_type, f"Disconnected with result code {int(int(reason_code.value))}")
 
         # ToDo: research how it works with v2
         # As of 1.6.1, Paho MQTT cannot have a callback invoke a second callback. So we won't attempt to reconnect here.
@@ -759,7 +759,7 @@ class MQTTPublishV2(MQTTPublish):
 
     def on_connect(self, _client, _userdata, flags, reason_code, _properties):
         """ The on_connect callback. """
-        loginf(self.publish_type, "Connected with result code %i" % int(reason_code.value))
+        loginf(self.publish_type, f"Connected with result code {int(int(reason_code.value))}")
         loginf(self.publish_type, f"Connected flags {str(flags)}")
         if self.lwt_dict:
             self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
@@ -776,9 +776,9 @@ class MQTTPublishV2(MQTTPublish):
         # If any other value the disconnection was unexpected,
         # such as might be caused by a network error.
         if int(reason_code.value) == 0:
-            loginf(self.publish_type, "Disconnected with result code %i" % int(reason_code.value))
+            loginf(self.publish_type, f"Disconnected with result code {int(int(reason_code.value))}")
         else:
-            logerr(self.publish_type, "Disconnected with result code %i" % int(reason_code.value))
+            logerr(self.publish_type, f"Disconnected with result code {int(int(reason_code.value))}")
 
         # ToDo: research how it works with v2
         # As of 1.6.1, Paho MQTT cannot have a callback invoke a second callback. So we won't attempt to reconnect here.
@@ -1214,9 +1214,9 @@ class PublishQueueThread(AbstractPublishThread):
 
         loginf(self.publish_type, f"External queue data binding is  {self.binding}")
         loginf(self.publish_type, f"MQTT queue data binding is  {self.mqtt_binding}")
-        loginf(self.publish_type, "Wait before retry is %i" % self.wait_before_retry)
-        loginf(self.publish_type, "Publish interval is %i" % self.publish_interval)
-        loginf(self.publish_type, "Publish delay is %i" % self.publish_delay)
+        loginf(self.publish_type, f"Wait before retry is {int(self.wait_before_retry)}")
+        loginf(self.publish_type, f"Publish interval is {int(self.publish_interval)}")
+        loginf(self.publish_type, f"Publish delay is {int(self.publish_delay)}")
 
         self.topics_loop, self.topics_archive = self.configure_topics(self.service_dict)
 
@@ -1308,7 +1308,7 @@ class PublishQueueThread(AbstractPublishThread):
                 if data_type == 'archive':
                     self.publish_row(time_stamp, json.loads(data), self.topics_archive)
                 i += 1
-                logdbg(self.publish_type, "catchup %i of %i" % (i, len(rows)))
+                logdbg(self.publish_type, f"catchup {int(i)} of {len(rows)}")
 
             row_count, = self.dbm.getSql("SELECT COUNT(*) from archive;")
 
@@ -1345,7 +1345,7 @@ class PublishWeeWXThread(AbstractPublishThread):
         self.keepalive = to_int(self.service_dict.get('keepalive', 60))
 
 
-        loginf(self.publish_type, "Wait before retry is %i" % self.wait_before_retry)
+        loginf(self.publish_type, f"Wait before retry is {int(self.wait_before_retry)}")
 
         self.data_queue = data_queue
         self.threading_event = threading.Event()
