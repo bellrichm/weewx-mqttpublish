@@ -190,8 +190,10 @@ Configuration:
 # need to be python 2 compatible pylint: disable=bad-option-value, raise-missing-from, super-with-arguments
 # pylint: enable=bad-option-value
 try:
+    # python 3
     import queue as Queue
 except ImportError:
+    # python 2
     import Queue
 
 import argparse
@@ -306,7 +308,7 @@ def gettid():
     """Get TID as displayed by htop.
        This is architecture dependent."""
     import ctypes #  need to be python 2 compatible, Want to keep this piece of code self contained. pylint: disable=bad-option-value, import-outside-toplevel
-    from ctypes.util import find_library
+    from ctypes.util import find_library # want to keep this 'local ' pylint: disable=import-outside-toplevel
     # pylint: enable=bad-option-value
     libc = ctypes.CDLL(find_library('c'))
 
