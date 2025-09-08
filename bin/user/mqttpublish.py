@@ -1184,14 +1184,14 @@ class AbstractPublishThread(threading.Thread):
                                                   data_keyword)
             if topics[topic]['type'] == 'individual':
                 updated_record = self.update_record(topics[topic], record)
-                for key in updated_record:
+                for key, value in updated_record.items():
                     self.mqtt_publish.publish_message(time_stamp,
                                                       0,
                                                       topics[topic]['guarantee_delivery'],
                                                       topics[topic]['qos'],
                                                       topics[topic]['retain'],
                                                       topic + '/' + key,
-                                                      updated_record[key])
+                                                      value)
 
 class PublishQueueThread(AbstractPublishThread):
     """ Publish to MQTT from an external/persistent queue. """
