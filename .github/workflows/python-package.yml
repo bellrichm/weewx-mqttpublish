@@ -32,7 +32,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install coverage configobj flake8 mock pytest pytest-html weewx==${{ matrix.weewx-version }}
+        python -m pip install coverage coveralls configobj flake8 mock pytest pytest-cov pytest-html weewx==${{ matrix.weewx-version }}
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Lint with flake8
       run: |
@@ -58,3 +58,39 @@ jobs:
       with:
         name: test-${{ matrix.python-version }}-${{ matrix.weewx-version }}
         path: results
+
+    # Temporarily do not run code coverage, because currently there is none
+    #- name: coveralls - 
+    #  if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
+    #  run: |
+    #    coverage run --branch -m pytest bin/user/tests/unit
+    #    coverage xml --include bin/user/mqttpublish.py # Generates coverage.xml
+    #- name: Upload coverage to Coveralls
+    #  if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
+    #  uses: coverallsapp/github-action@v2
+    #  with:
+    #    format: cobertura
+    #    file: coverage.xml
+
+    - name: Codecov
+      if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
+      run: pytest bin/user/tests/unit --cov --cov-branch --cov-report=xml
+    - name: Upload results to Codecov
+      if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+  sonarqube:
+    name: SonarQube
+    # Only run once, against the latest python version and weewx version
+    #  if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
