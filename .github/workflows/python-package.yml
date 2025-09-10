@@ -72,9 +72,9 @@ jobs:
     #    format: cobertura
     #    file: coverage.xml
 
-    - name: Run tests
+    - name: Codecov
       if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
-      run: pytest bin/user/mqttpublish.py --cov --cov-branch --cov-report=xml
+      run: pytest bin/user/tests/unit --cov --cov-branch --cov-report=xml
     - name: Upload results to Codecov
       if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
       uses: codecov/codecov-action@v5
