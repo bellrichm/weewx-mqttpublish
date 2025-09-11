@@ -135,7 +135,7 @@ from weeutil.weeutil import to_bool, to_float, to_int, TimeSpan
 import weewx
 from weewx.engine import StdService
 
-VERSION = "0.3.2-rc01"
+VERSION = "1.0.0-rc01a"
 
 try:
     # Test for new-style weewx logging by trying to import weeutil.logger
