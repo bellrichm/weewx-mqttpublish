@@ -633,12 +633,14 @@ class PublishWeeWX():
 class MQTTPublish(StdService):
     """ A service to publish WeeWX loop and/or archive data to MQTT. """
     def __init__(self, engine, config_dict):
-        self.config_dict = config_dict
-        super(MQTTPublish, self).__init__(engine, self.config_dict)
+        super(MQTTPublish, self).__init__(engine, config_dict)
 
-        service_dict = config_dict.get('MQTTPublish', {}).get('PublishWeeWX', {})
+        self.service_dict = config_dict.get('MQTTPublish', {})
+        #  backwards compatability
+        if 'PublishWeeWX' in self.service_dict.sections:
+            self.service_dict = config_dict.get('MQTTPublish', {}).get('PublishWeeWX', {})
 
-        self.enable = to_bool(service_dict.get('enable', True))
+        self.enable = to_bool(self.service_dict.get('enable', True))
         if not self.enable:
             loginf("Not enabled, exiting.")
             return
@@ -649,7 +651,7 @@ class MQTTPublish(StdService):
         self.thread_restarts = 0
 
         # todo, tie this into the topic bindings somehow...
-        binding = weeutil.weeutil.option_as_list(service_dict.get('binding', ['archive', 'loop']))
+        binding = weeutil.weeutil.option_as_list(self.service_dict.get('binding', ['archive', 'loop']))
 
         self.data_queue = Queue.Queue()
 
@@ -659,7 +661,7 @@ class MQTTPublish(StdService):
         if 'archive' in binding:
             self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
 
-        self._thread = PublishWeeWXThread(self.config_dict, self.data_queue)
+        self._thread = PublishWeeWXThread(self.service_dict, self.data_queue)
         self.thread_start()
 
         #logdbg("Threadid of PublishWeeWX is: %s" % gettid())
@@ -692,7 +694,7 @@ class MQTTPublish(StdService):
         if not self._thread.running:
             if self.thread_restarts < self.max_thread_restarts:
                 self.thread_restarts += 1
-                self._thread = PublishWeeWXThread(self.config_dict, self.data_queue)
+                self._thread = PublishWeeWXThread(self.service_dict, self.data_queue)
                 self.thread_start()
 
                 self.data_queue.put({'time_stamp': data['dateTime'], 'type': data_type, 'data': data})
@@ -737,7 +739,7 @@ class PublishWeeWXThread(threading.Thread):
         'percent': None,
         'unix_epoch': None,
         }
-    def __init__(self, config_dict, data_queue):
+    def __init__(self, service_dict, data_queue):
         threading.Thread.__init__(self)
 
         self.publisher = None
@@ -745,8 +747,7 @@ class PublishWeeWXThread(threading.Thread):
 
         self.db_manager = None
 
-        self.config_dict = config_dict
-        self.service_dict = config_dict.get('MQTTPublish', {}).get('PublishWeeWX', {})
+        self.service_dict = service_dict
 
         exclude_keys = ['password']
         sanitized_service_dict = {k: self.service_dict[k] for k in set(list(self.service_dict.keys())) - set(exclude_keys)}
