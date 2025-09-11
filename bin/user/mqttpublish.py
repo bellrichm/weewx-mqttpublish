@@ -189,20 +189,6 @@ except ImportError:
         """ Log error level. """
         logmsg(syslog.LOG_ERR, msg)
 
-schema = [ # confirm to standards pylint: disable=invalid-name
-    ('dateTime', 'INTEGER NOT NULL'),
-    ('usUnits', 'INTEGER'),
-    ('interval', 'INTEGER'),
-    ('mid', 'INTEGER'),
-    ('rc', 'INTEGER'),
-    ('prevMid', 'INTEGER'),
-    ('proc_dateTime', 'INTEGER'),
-    ('pub_dateTime', 'INTEGER'),
-    ('qos', 'INTEGER'),
-    ('topic', 'STRING'),
-    ('data', 'STRING'),
-    ]
-
 # need to rethink
 # pylint: disable=unnecessary-lambda
 period_timespan = {
