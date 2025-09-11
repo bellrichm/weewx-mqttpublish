@@ -719,8 +719,9 @@ class PublishWeeWX(StdService):
 
             self._thread = None
 
-class AbstractPublishThread(threading.Thread):
-    """ Some base functionality for publishing. """
+class PublishWeeWXThread(threading.Thread):
+    """Publish WeeWX data to MQTT. """
+    # pylint: disable=too-many-instance-attributes
     UNIT_REDUCTIONS = {
         'degree_F': 'F',
         'degree_C': 'C',
@@ -739,13 +740,31 @@ class AbstractPublishThread(threading.Thread):
         'percent': None,
         'unix_epoch': None,
         }
-    def __init__(self):
+    def __init__(self, config_dict, data_queue):
         threading.Thread.__init__(self)
 
         self.mqtt_publish = None
         self.running = False
 
         self.db_manager = None
+
+        self.config_dict = config_dict
+        self.service_dict = config_dict.get('MQTTPublish', {}).get('PublishWeeWX', {})
+
+        exclude_keys = ['password']
+        sanitized_service_dict = {k: self.service_dict[k] for k in set(list(self.service_dict.keys())) - set(exclude_keys)}
+        logdbg(f"sanitized configuration removed {exclude_keys}")
+        logdbg(f"sanitized_service_dict is {sanitized_service_dict}")
+
+        self.topics_loop, self.topics_archive = self.configure_topics(self.service_dict)
+        self.wait_before_retry = float(self.service_dict.get('wait_before_retry', 2))
+        self.keepalive = to_int(self.service_dict.get('keepalive', 60))
+
+
+        loginf(f"Wait before retry is {int(self.wait_before_retry)}")
+
+        self.data_queue = data_queue
+        self.threading_event = threading.Event()
 
     def configure_fields(self, fields_dict, ignore, publish_none_value, append_unit_label, conversion_type, format_string):
         """ Configure the fields. """
@@ -910,7 +929,7 @@ class AbstractPublishThread(threading.Thread):
         append_unit_label = fieldinfo.get('append_unit_label', topic_dict.get('append_unit_label'))
         if append_unit_label:
             (unit_type, _) = weewx.units.getStandardUnitType(unit_system, name)
-            unit_type = AbstractPublishThread.UNIT_REDUCTIONS.get(unit_type, unit_type)
+            unit_type = PublishWeeWXThread.UNIT_REDUCTIONS.get(unit_type, unit_type)
             if unit_type is not None:
                 name = f"{name}_{unit_type}"
 
@@ -961,29 +980,6 @@ class AbstractPublishThread(threading.Thread):
                                                       topics[topic]['retain'],
                                                       topic + '/' + key,
                                                       value)
-
-class PublishWeeWXThread(AbstractPublishThread):
-    """Publish WeeWX data to MQTT. """
-    # pylint: disable=too-many-instance-attributes
-    def __init__(self, config_dict, data_queue):
-        super(PublishWeeWXThread, self).__init__()
-        self.config_dict = config_dict
-        self.service_dict = config_dict.get('MQTTPublish', {}).get('PublishWeeWX', {})
-
-        exclude_keys = ['password']
-        sanitized_service_dict = {k: self.service_dict[k] for k in set(list(self.service_dict.keys())) - set(exclude_keys)}
-        logdbg(f"sanitized configuration removed {exclude_keys}")
-        logdbg(f"sanitized_service_dict is {sanitized_service_dict}")
-
-        self.topics_loop, self.topics_archive = self.configure_topics(self.service_dict)
-        self.wait_before_retry = float(self.service_dict.get('wait_before_retry', 2))
-        self.keepalive = to_int(self.service_dict.get('keepalive', 60))
-
-
-        loginf(f"Wait before retry is {int(self.wait_before_retry)}")
-
-        self.data_queue = data_queue
-        self.threading_event = threading.Event()
 
     def run(self):
         self.running = True
