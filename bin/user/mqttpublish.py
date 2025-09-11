@@ -228,7 +228,7 @@ def gettid():
 
 class MQTTPublish(object):
     """ Managing publishing to MQTT. """
-    def __init__(self, publisher, publish_type, service_dict):
+    def __init__(self, publisher, service_dict):
         self.connected = False
         self.mqtt_logger = {
             mqtt.MQTT_LOG_INFO: loginf,
