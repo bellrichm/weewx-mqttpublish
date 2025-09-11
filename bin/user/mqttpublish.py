@@ -119,6 +119,7 @@ except ImportError:
     # python 2
     import Queue
 
+import abc
 import datetime
 import json
 import random
@@ -226,7 +227,7 @@ def gettid():
 
     return 0
 
-class MQTTPublish(object):
+class AbstractPublisher(abc.ABC):
     """ Managing publishing to MQTT. """
     def __init__(self, publisher, service_dict):
         self.connected = False
@@ -284,17 +285,17 @@ class MQTTPublish(object):
         self._connect()
 
     @classmethod
-    def get_publish(cls, publisher, service_dict):
+    def get_publisher(cls, publisher, service_dict):
         ''' Factory method to get appropriate MQTTPublish for paho mqtt version. '''
         if hasattr(mqtt, 'CallbackAPIVersion'):
             protocol_string = service_dict.get('protocol', 'MQTTv311')
             protocol = getattr(mqtt, protocol_string, 0)
             if protocol in [mqtt.MQTTv31, mqtt.MQTTv311]:
-                return MQTTPublishV2MQTT3(publisher, service_dict)
+                return PublisherV2MQTT3(publisher, service_dict)
 
-            return MQTTPublishV2(publisher, service_dict)
+            return PublisherV2(publisher, service_dict)
 
-        return MQTTPublishV1(publisher, service_dict)
+        return PublisherV1(publisher, service_dict)
 
     def _connect(self):
         try:
@@ -424,7 +425,7 @@ class MQTTPublish(object):
         ''' Connect to the MQTT server. '''
         raise NotImplementedError("Method 'connect' is not implemented")
 
-class MQTTPublishV1(MQTTPublish):
+class PublisherV1(AbstractPublisher):
     ''' MQTTPublish that communicates with paho mqtt v1.'''
     def __init__(self, publisher, service_dict):
         protocol_string = service_dict.get('protocol', 'MQTTv311')
@@ -498,7 +499,7 @@ class MQTTPublishV1(MQTTPublish):
         qos = ""
         logdbg(f"Published  ({int(time.time())}): {time_stamp} {mid} {qos}")
 
-class MQTTPublishV2MQTT3(MQTTPublish):
+class PublisherV2MQTT3(AbstractPublisher):
     ''' MQTTPublish that communicates with paho mqtt v2. '''
     def get_client(self, client_id, protocol):
         ''' Get the MQTT client. '''
@@ -559,7 +560,7 @@ class MQTTPublishV2MQTT3(MQTTPublish):
         qos = ""
         logdbg(f"Published  ({int(time.time())}): {time_stamp} {mid} {qos}")
 
-class MQTTPublishV2(MQTTPublish):
+class PublisherV2(AbstractPublisher):
     ''' MQTTPublish that communicates with paho mqtt v2. '''
     def get_client(self, client_id, protocol):
         ''' Get the MQTT client. '''
@@ -619,11 +620,21 @@ class MQTTPublishV2(MQTTPublish):
         qos = ""
         logdbg(f"Published  ({int(time.time())}): {time_stamp} {mid} {qos}")
 
-class PublishWeeWX(StdService):
+
+class PublishWeeWX():
+    """ Backwards compatibility class."""
+    def __init__(self, engine, config_dict):
+        self.mqtt_publish = MQTTPublish(engine, config_dict)
+
+    def shutDown(self): # need to override parent - pylint: disable=invalid-name
+        """Run when an engine shutdown is requested."""
+        self.mqtt_publish.shutDown()
+
+class MQTTPublish(StdService):
     """ A service to publish WeeWX loop and/or archive data to MQTT. """
     def __init__(self, engine, config_dict):
         self.config_dict = config_dict
-        super(PublishWeeWX, self).__init__(engine, self.config_dict)
+        super(MQTTPublish, self).__init__(engine, self.config_dict)
 
         service_dict = config_dict.get('MQTTPublish', {}).get('PublishWeeWX', {})
 
@@ -729,7 +740,7 @@ class PublishWeeWXThread(threading.Thread):
     def __init__(self, config_dict, data_queue):
         threading.Thread.__init__(self)
 
-        self.mqtt_publish = None
+        self.publisher = None
         self.running = False
 
         self.db_manager = None
@@ -945,7 +956,7 @@ class PublishWeeWXThread(threading.Thread):
         for topic in topics:
             if topics[topic]['type'] == 'json':
                 updated_record = self.update_record(topics[topic], record)
-                self.mqtt_publish.publish_message(time_stamp,
+                self.publisher.publish_message(time_stamp,
                                                   topics[topic]['qos'],
                                                   topics[topic]['retain'],
                                                   topic,
@@ -953,7 +964,7 @@ class PublishWeeWXThread(threading.Thread):
             if topics[topic]['type'] == 'keyword':
                 updated_record = self.update_record(topics[topic], record)
                 data_keyword = ', '.join(f"{key}={val}" for (key, val) in updated_record.items())
-                self.mqtt_publish.publish_message(time_stamp,
+                self.publisher.publish_message(time_stamp,
                                                   topics[topic]['qos'],
                                                   topics[topic]['retain'],
                                                   topic,
@@ -961,7 +972,7 @@ class PublishWeeWXThread(threading.Thread):
             if topics[topic]['type'] == 'individual':
                 updated_record = self.update_record(topics[topic], record)
                 for key, value in updated_record.items():
-                    self.mqtt_publish.publish_message(time_stamp,
+                    self.publisher.publish_message(time_stamp,
                                                       topics[topic]['qos'],
                                                       topics[topic]['retain'],
                                                       topic + '/' + key,
@@ -972,7 +983,7 @@ class PublishWeeWXThread(threading.Thread):
         #logdbg("Threadid of PublishWeeWXThread: %s" % gettid())
 
         # need to instantiate inside thread
-        self.mqtt_publish = MQTTPublish.get_publish(self, self.service_dict)
+        self.publisher = AbstractPublisher.get_publisher(self, self.service_dict)
 
         while self.running:
             try:
@@ -989,7 +1000,7 @@ class PublishWeeWXThread(threading.Thread):
             except Queue.Empty:
                 # todo this causes another connection, seems to cause no harm
                 # does cause a socket error/disconnect message on the server
-                self.mqtt_publish.client.loop(timeout=0.1)
+                self.publisher.client.loop(timeout=0.1)
                 # ToDo - investigate my 'sleep' implementation
                 self.threading_event.wait(self.keepalive/4)
                 self.threading_event.clear()
