@@ -4,18 +4,13 @@ To uninstall run
 wee_extension --uninstall=mqttpublish
 """
 
-import configobj
+from io import StringIO
 
-try:
-    # Python 2
-    from StringIO import StringIO
-except ImportError:
-    # Python 3
-    from io import StringIO
+import configobj
 
 from weecfg.extension import ExtensionInstaller
 
-VERSION = "0.3.2-rc01"
+VERSION = "1.0.0-rc01a"
 
 MQTTPUBLISH_CONFIG = """
 [MQTTPublish]
