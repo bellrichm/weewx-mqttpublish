@@ -599,7 +599,7 @@ class MQTTPublish(StdService):
         self.service_dict = config_dict.get('MQTTPublish', {})
         #  backwards compatability
         if 'PublishWeeWX' in self.service_dict.sections:
-            logerr("''PublishWeeWX' is deprecated. Move options to top level, '[MQTTPublish]'.")
+            logerr("'PublishWeeWX' is deprecated. Move options to top level, '[MQTTPublish]'.")
             self.service_dict = config_dict.get('MQTTPublish', {}).get('PublishWeeWX', {})
 
         self.enable = to_bool(self.service_dict.get('enable', True))
