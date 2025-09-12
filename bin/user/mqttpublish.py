@@ -115,15 +115,16 @@ import queue as Queue
 import abc
 import datetime
 import json
+import logging
 import random
 import ssl
 import threading
 import time
 import traceback
 
-
 import paho.mqtt.client as mqtt
 
+import weeutil
 from weeutil.weeutil import to_bool, to_float, to_int, TimeSpan
 
 import weewx
@@ -131,9 +132,7 @@ from weewx.engine import StdService
 
 VERSION = "1.0.0-rc01a"
 
-import weeutil.logger
-import logging
-log = logging.getLogger(__name__) # confirm to standards pylint: disable=invalid-name
+log = logging.getLogger(__name__)
 def setup_logging(logging_level, config_dict):
     """ Setup logging for running in standalone mode."""
     if logging_level:
@@ -178,9 +177,8 @@ period_timespan = {
 def gettid():
     """Get TID as displayed by htop.
        This is architecture dependent."""
-    import ctypes # want to keep this 'local ' pylint: import-outside-toplevel
-    from ctypes.util import find_library # want to keep this 'local ' pylint: disable=import-outside-toplevel
-    # pylint: enable=bad-option-value
+    import ctypes # want to keep this 'local' pylint: disable=import-outside-toplevel
+    from ctypes.util import find_library # want to keep this 'local' pylint: disable=import-outside-toplevel
     libc = ctypes.CDLL(find_library('c'))
 
     for cmd in (186, 224, 178):
