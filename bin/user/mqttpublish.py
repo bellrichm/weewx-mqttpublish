@@ -110,14 +110,7 @@ Configuration:
                     period =
 """
 
-# need to be python 2 compatible pylint: disable=bad-option-value, raise-missing-from, super-with-arguments
-# pylint: enable=bad-option-value
-try:
-    # python 3
-    import queue as Queue
-except ImportError:
-    # python 2
-    import Queue
+import queue as Queue
 
 import abc
 import datetime
@@ -138,57 +131,27 @@ from weewx.engine import StdService
 
 VERSION = "1.0.0-rc01a"
 
-try:
-    # Test for new-style weewx logging by trying to import weeutil.logger
-    import weeutil.logger
-    import logging
-    log = logging.getLogger(__name__) # confirm to standards pylint: disable=invalid-name
-    def setup_logging(logging_level, config_dict):
-        """ Setup logging for running in standalone mode."""
-        if logging_level:
-            weewx.debug = logging_level
+import weeutil.logger
+import logging
+log = logging.getLogger(__name__) # confirm to standards pylint: disable=invalid-name
+def setup_logging(logging_level, config_dict):
+    """ Setup logging for running in standalone mode."""
+    if logging_level:
+        weewx.debug = logging_level
 
-        weeutil.logger.setup('wee_MQTTSS', config_dict)
+    weeutil.logger.setup('wee_MQTTSS', config_dict)
 
-    def logdbg(msg):
-        """ Log debug level. """
-        log.debug(msg)
+def logdbg(msg):
+    """ Log debug level. """
+    log.debug(msg)
 
-    def loginf(msg):
-        """ Log informational level. """
-        log.info(msg)
+def loginf(msg):
+    """ Log informational level. """
+    log.info(msg)
 
-    def logerr(msg):
-        """ Log error level. """
-        log.error(msg)
-
-except ImportError:
-    # Old-style weewx logging
-    import syslog
-    def setup_logging(logging_level, config_dict): # Need to match signature pylint: disable=unused-argument
-        """ Setup logging for running in standalone mode."""
-        syslog.openlog('wee_MQTTSS', syslog.LOG_PID | syslog.LOG_CONS)
-        if logging_level:
-            syslog.setlogmask(syslog.LOG_UPTO(syslog.LOG_DEBUG))
-        else:
-            syslog.setlogmask(syslog.LOG_UPTO(syslog.LOG_INFO))
-
-    def logmsg(level, msg):
-        """ Log the message at the designated level. """
-        # Replace '__name__' with something to identify your application.
-        syslog.syslog(level, f'__name__: ({msg})')
-
-    def logdbg(msg):
-        """ Log debug level. """
-        logmsg(syslog.LOG_DEBUG, msg)
-
-    def loginf(msg):
-        """ Log informational level. """
-        logmsg(syslog.LOG_INFO, msg)
-
-    def logerr(msg):
-        """ Log error level. """
-        logmsg(syslog.LOG_ERR, msg)
+def logerr(msg):
+    """ Log error level. """
+    log.error(msg)
 
 # need to rethink
 # pylint: disable=unnecessary-lambda
@@ -215,7 +178,7 @@ period_timespan = {
 def gettid():
     """Get TID as displayed by htop.
        This is architecture dependent."""
-    import ctypes #  need to be python 2 compatible, Want to keep this piece of code self contained. pylint: disable=bad-option-value, import-outside-toplevel
+    import ctypes # want to keep this 'local ' pylint: import-outside-toplevel
     from ctypes.util import find_library # want to keep this 'local ' pylint: disable=import-outside-toplevel
     # pylint: enable=bad-option-value
     libc = ctypes.CDLL(find_library('c'))
