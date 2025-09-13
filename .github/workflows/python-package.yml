@@ -57,7 +57,7 @@ jobs:
         coverage run --branch -m pytest bin/user/tests/unit
         # Create a human readable coverage report
         coverage html --include bin/user/mqttpublish.py -d results/coverage
-        # Create an xml coverage report, used by: coveralls, codecov
+        # Create an xml coverage report, used by: coveralls, codecov, sonar
         coverage xml --include bin/user/mqttpublish.py
     
     - name: Archive test-results
@@ -78,6 +78,12 @@ jobs:
       uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: SonarQube Scan
+      if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
+      uses: SonarSource/sonarqube-scan-action@v5
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   #sonarqube:
   #  name: SonarQube
