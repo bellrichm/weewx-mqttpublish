@@ -29,7 +29,8 @@ class TestDeprecatedOptions(unittest.TestCase):
         }
         config = configobj.ConfigObj(config_dict)
         logger = logging.getLogger('user.mqttpublish')
-        with mock.patch('user.mqttpublish.mqtt'):
+        #with mock.patch('user.mqttpublish.mqtt'):
+        with mock.patch('user.mqttpublish.PublishWeeWXThread'):
             with mock.patch.object(logger, 'error') as mock_error:
                 SUT = user.mqttpublish.MQTTPublish(mock_engine, config)
                 #SUT.shutDown()
