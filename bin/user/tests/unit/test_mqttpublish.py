@@ -29,10 +29,11 @@ class TestDeprecatedOptions(unittest.TestCase):
         }
         config = configobj.ConfigObj(config_dict)
         logger = logging.getLogger('user.mqttpublish')
-        with mock.patch.object(logger, 'error') as mock_error:
-            SUT = user.mqttpublish.MQTTPublish(mock_engine, config)
-            SUT.shutDown()
-            mock_error.assert_called_once_with("'PublishWeeWX' is deprecated. Move options to top level, '[MQTTPublish]'.")
+        with mock.patch('user.mqttpublish.mqtt'):
+            with mock.patch.object(logger, 'error') as mock_error:
+                SUT = user.mqttpublish.MQTTPublish(mock_engine, config)
+                SUT.shutDown()
+                mock_error.assert_called_once_with("'PublishWeeWX' is deprecated. Move options to top level, '[MQTTPublish]'.")
 
         print("end")
 
