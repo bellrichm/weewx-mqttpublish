@@ -52,7 +52,7 @@ jobs:
       run: |
         export PYTHONPATH=bin:$PYTHONPATH
         coverage run --branch -m pytest bin/user/tests/unit
-        coverage html --include bin/user/aqitype.py -d results/coverage
+        coverage html --include bin/user/mqttpublish.py -d results/coverage
     - name: Archive test-results
       uses: actions/upload-artifact@v4
       with:
