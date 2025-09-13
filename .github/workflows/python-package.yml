@@ -29,43 +29,43 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         python -m pip install coverage coveralls configobj flake8 mock paho-mqtt pytest pytest-cov pytest-html weewx==${{ matrix.weewx-version }}
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
         flake8 --tee --output-file=results/flake8.txt bin/user --exclude tests --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 --tee --output-file=results/flake8.txt bin/user --exclude tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
     - name: Test with pytest
       run: |
         export PYTHONPATH=bin:$PYTHONPATH
         pytest bin/user/tests/unit --html=results/unittests.html --self-contained-html
         pytest bin/user/tests/func --html=results/functests.html --self-contained-html
+    
     - name: Code Coverage
     # Only run code coverage once, against the latest python version and weewx version
       if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
       run: |
         export PYTHONPATH=bin:$PYTHONPATH
         coverage run --branch -m pytest bin/user/tests/unit
+        # Create a human readable coverage report
         coverage html --include bin/user/mqttpublish.py -d results/coverage
+        # Create an xml coverage report, used by: coveralls, codecov
         coverage xml --include bin/user/mqttpublish.py
+    
     - name: Archive test-results
       uses: actions/upload-artifact@v4
       with:
         name: test-${{ matrix.python-version }}-${{ matrix.weewx-version }}
         path: results
 
-    # Temporarily do not run code coverage, because currently there is none
-    #- name: coveralls - 
-    #  if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
-    #  run: |
-    #    coverage run --branch -m pytest bin/user/tests/unit
-    #    coverage xml --include bin/user/mqttpublish.py # Generates coverage.xml
-  
     - name: Upload coverage to Coveralls
       if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
       uses: coverallsapp/github-action@v2
@@ -73,10 +73,7 @@ jobs:
         format: cobertura
         file: coverage.xml
 
-    #- name: Codecov
-    #  if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
-    #  run: pytest bin/user/tests/unit --cov --cov-branch --cov-report=xml
-    - name: Upload results to Codecov
+    - name: Upload coverage to Codecov
       if: ${{ matrix.python-version == env.LATEST_PYTHON_VERSION && matrix.weewx-version == env.LATEST_WEEWX_VERSION}}
       uses: codecov/codecov-action@v5
       with:
