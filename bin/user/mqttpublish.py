@@ -122,6 +122,7 @@ import threading
 import time
 import traceback
 
+import configobj
 import paho.mqtt.client as mqtt
 
 import weeutil
@@ -974,6 +975,48 @@ class PublishWeeWXThread(threading.Thread):
 if __name__ == "__main__":
     def main():
         """ Run it. """
+        min_config_dict = {
+            'Station': {
+                'altitude': [0, 'foot'],
+                'latitude': 0,
+                'station_type': 'Simulator',
+                'longitude': 0
+            },
+            'Simulator': {
+                'driver': 'weewx.drivers.simulator',
+            },
+            'Engine': {
+                'Services': {}
+            }
+        }
+        engine = weewx.engine.StdEngine(min_config_dict)
+
+        data_json = ''
+        with open('tmp/message.json', encoding='UTF-8') as file_object:
+            message = file_object.readline()
+            while message:
+                data_json += message
+                message = file_object.readline()
+
+        data = json.loads(data_json)
+
+        config_dict = {
+            'MQTTPublish': {
+                'topics': {
+                    'test/loop': {
+                        'binding': 'loop',
+                        'type': 'json'
+                    }
+                }
+            }
+        }
+        config = configobj.ConfigObj(config_dict)
+        mqtt_publish = MQTTPublish(engine, config)
+
+        new_loop_packet_event = weewx.Event(weewx.NEW_LOOP_PACKET, packet=data)
+        engine.dispatchEvent(new_loop_packet_event)
+
+        mqtt_publish.shutDown()
         return
 
     main()
