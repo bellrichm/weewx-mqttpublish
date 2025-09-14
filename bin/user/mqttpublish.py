@@ -991,6 +991,32 @@ if __name__ == "__main__":
         }
         engine = weewx.engine.StdEngine(min_config_dict)
 
+        config_dict = {
+            'debug': 1,
+            'MQTTPublish': {
+                'topics': {
+                    'test/loop': {
+                        'binding': 'loop',
+                        'type': 'json'
+                    }
+                }
+            },
+            'Logging': {
+                'root': {
+                    'handlers': ['syslog', 'console']
+                },
+                'loggers': {
+                    'user.mqttpublish': {
+                        'level': 'DEBUG'
+                    }
+                }
+            }
+        }
+        config = configobj.ConfigObj(config_dict)
+
+        setup_logging(True, config_dict)
+        mqtt_publish = MQTTPublish(engine, config)
+
         data_json = ''
         with open('tmp/message.json', encoding='UTF-8') as file_object:
             message = file_object.readline()
@@ -999,19 +1025,6 @@ if __name__ == "__main__":
                 message = file_object.readline()
 
         data = json.loads(data_json)
-
-        config_dict = {
-            'MQTTPublish': {
-                'topics': {
-                    'test/loop': {
-                        'binding': 'loop',
-                        'type': 'json'
-                    }
-                }
-            }
-        }
-        config = configobj.ConfigObj(config_dict)
-        mqtt_publish = MQTTPublish(engine, config)
 
         new_loop_packet_event = weewx.Event(weewx.NEW_LOOP_PACKET, packet=data)
         engine.dispatchEvent(new_loop_packet_event)
