@@ -175,20 +175,6 @@ period_timespan = {
 }
 # pylint: enable=unnecessary-lambda
 
-def gettid():
-    """Get TID as displayed by htop.
-       This is architecture dependent."""
-    import ctypes # want to keep this 'local' pylint: disable=import-outside-toplevel
-    from ctypes.util import find_library # want to keep this 'local' pylint: disable=import-outside-toplevel
-    libc = ctypes.CDLL(find_library('c'))
-
-    for cmd in (186, 224, 178):
-        tid = ctypes.CDLL(libc).syscall(cmd)
-        if tid != -1:
-            return tid
-
-    return 0
-
 class AbstractPublisher(abc.ABC):
     """ Managing publishing to MQTT. """
     def __init__(self, publisher, service_dict):
@@ -597,6 +583,8 @@ class MQTTPublish(StdService):
     def __init__(self, engine, config_dict):
         super(MQTTPublish, self).__init__(engine, config_dict)
 
+        logdbg(f" native id in 'main' init {threading.get_native_id()}")
+
         self.service_dict = config_dict.get('MQTTPublish', {})
         #  backwards compatability
         if 'PublishWeeWX' in self.service_dict.sections:
@@ -626,8 +614,6 @@ class MQTTPublish(StdService):
 
         self._thread = PublishWeeWXThread(self.service_dict, self.data_queue)
         self.thread_start()
-
-        #logdbg("Threadid of PublishWeeWX is: %s" % gettid())
 
     def thread_start(self):
         """Start the publishing thread."""
@@ -704,6 +690,8 @@ class PublishWeeWXThread(threading.Thread):
         }
     def __init__(self, service_dict, data_queue):
         threading.Thread.__init__(self)
+
+        logdbg(f" native id in init {threading.get_native_id()}")
 
         self.publisher = None
         self.running = False
@@ -944,7 +932,8 @@ class PublishWeeWXThread(threading.Thread):
 
     def run(self):
         self.running = True
-        #logdbg("Threadid of PublishWeeWXThread: %s" % gettid())
+        logdbg(f"{self.name} {threading.get_ident()}")
+        logdbg(f" native id in run {threading.get_native_id()}")
 
         # need to instantiate inside thread
         self.publisher = AbstractPublisher.get_publisher(self, self.service_dict)
