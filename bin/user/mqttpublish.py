@@ -654,7 +654,7 @@ class MQTTPublish(StdService):
         self._handle_record('archive', event.record)
 
     def _handle_record(self, data_type, data):
-        if not self._thread.running:
+        if not self._thread.is_alive():
             if self.thread_restarts < self.max_thread_restarts:
                 self.thread_restarts += 1
                 self._thread = PublishWeeWXThread(self.service_dict, self.data_queue)
@@ -1029,6 +1029,8 @@ if __name__ == "__main__":
         new_loop_packet_event = weewx.Event(weewx.NEW_LOOP_PACKET, packet=data)
         engine.dispatchEvent(new_loop_packet_event)
 
+        # ToDo: Need better solution than sleeping
+        time.sleep(3)
         mqtt_publish.shutDown()
         return
 
