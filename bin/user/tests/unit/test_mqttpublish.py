@@ -3,10 +3,6 @@
 #    See the file LICENSE.txt for your full rights.
 #
 
-# pylint: disable=wrong-import-order
-# pylint: disable=missing-docstring
-# pylint: disable=invalid-name
-
 import configobj
 import logging
 
@@ -29,17 +25,18 @@ class TestDeprecatedOptions(unittest.TestCase):
         }
         config = configobj.ConfigObj(config_dict)
         logger = logging.getLogger('user.mqttpublish')
-        #with mock.patch('user.mqttpublish.mqtt'):
+        # with mock.patch('user.mqttpublish.mqtt'):
         with mock.patch('user.mqttpublish.PublishWeeWXThread'):
             with mock.patch.object(logger, 'error') as mock_error:
                 user.mqttpublish.MQTTPublish(mock_engine, config)
-                mock_error.assert_called_once_with("'PublishWeeWX' is deprecated. Move options to top level, '[MQTTPublish]'.")
+                mock_error.assert_called_once_with(
+                    "'PublishWeeWX' is deprecated. Move options to top level, '[MQTTPublish]'.")
 
         print("end")
 
 if __name__ == '__main__':
-    test_suite = unittest.TestSuite()
-    test_suite.addTest(TestDeprecatedOptions('test_PublishWeeWX_stanza_is_deprecated'))
-    unittest.TextTestRunner().run(test_suite)
+    test_suite = unittest.TestSuite()                                                    # noqa: E265
+    test_suite.addTest(TestDeprecatedOptions('test_PublishWeeWX_stanza_is_deprecated'))  # noqa: E265
+    unittest.TextTestRunner().run(test_suite)                                            # noqa: E265
 
-    #unittest.main(exit=False)
+    #unittest.main(exit=False)                                                           # noqa: E265

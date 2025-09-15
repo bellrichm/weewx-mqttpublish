@@ -3,10 +3,6 @@
 #    See the file LICENSE.txt for your full rights.
 #
 
-# pylint: disable=wrong-import-order
-# pylint: disable=missing-docstring
-# pylint: disable=invalid-name
-
 import unittest
 
 class TestTemplate(unittest.TestCase):
@@ -14,8 +10,8 @@ class TestTemplate(unittest.TestCase):
         pass
 
 if __name__ == '__main__':
-    #test_suite = unittest.TestSuite()
-    #3test_suite.addTest(TestTemplate('test_template'))
-    #unittest.TextTestRunner().run(test_suite)
+    #test_suite = unittest.TestSuite()                  # noqa: E265
+    #test_suite.addTest(TestTemplate('test_template'))  # noqa: E265
+    #unittest.TextTestRunner().run(test_suite)          # noqa: E265
 
-    unittest.main(exit=False)
+    unittest.main(exit=False)                           # noqa: E265
