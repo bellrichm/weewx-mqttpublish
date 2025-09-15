@@ -164,13 +164,13 @@ period_timespan = {
     'year': lambda time_stamp: weeutil.weeutil.archiveYearSpan(time_stamp),
     'last24hours': lambda time_stamp: TimeSpan(time_stamp, time_stamp - 86400),
     'last7days': lambda time_stamp: TimeSpan(time_stamp,
-                                                time.mktime((datetime.date.fromtimestamp(time_stamp) - \
-                                                            datetime.timedelta(days=7)).timetuple())),
+                                             time.mktime((datetime.date.fromtimestamp(time_stamp) -
+                                                          datetime.timedelta(days=7)).timetuple())),
     'last31days': lambda time_stamp: TimeSpan(time_stamp,
-                                                time.mktime((datetime.date.fromtimestamp(time_stamp) - \
-                                                            datetime.timedelta(days=31)).timetuple())),
+                                              time.mktime((datetime.date.fromtimestamp(time_stamp) -
+                                                           datetime.timedelta(days=31)).timetuple())),
     'last366days': lambda time_stamp: TimeSpan(time_stamp,
-                                                time.mktime((datetime.date.fromtimestamp(time_stamp) - \
+                                               time.mktime((datetime.date.fromtimestamp(time_stamp) -
                                                             datetime.timedelta(days=366)).timetuple()))
 }
 # pylint: enable=unnecessary-lambda
@@ -185,21 +185,10 @@ class AbstractPublisher(abc.ABC):
             mqtt.MQTT_LOG_WARNING: loginf,
             mqtt.MQTT_LOG_ERR: logerr,
             mqtt.MQTT_LOG_DEBUG: logdbg
-            }
+        }
 
         self.publisher = publisher
         self.mqtt_config = mqtt_config
-
-        #self.max_retries = mqtt_config['max_retries']
-        #self.retry_wait = mqtt_config['retry_wait']
-        #log_mqtt = mqtt_config['log_mqtt']
-        #self.host = mqtt_config['host']
-        #self.keepalive = mqtt_config['keepalive']
-        #self.port = mqtt_config['port']
-        #username = mqtt_config['username']
-        #password = mqtt_config['password']
-        #clientid = mqtt_config['clientid']
-        #self.protocol = mqtt_config['protocol']
 
         self.client = self.get_client(mqtt_config['clientid'], mqtt_config['protocol'])
         self.set_callbacks(mqtt_config['log_mqtt'])
@@ -235,7 +224,7 @@ class AbstractPublisher(abc.ABC):
     def _connect(self):
         try:
             self.connect(self.mqtt_config['host'], self.mqtt_config['port'], self.mqtt_config['keepalive'])
-        except Exception as exception: # (want to catch all) pylint: disable=broad-except
+        except Exception as exception:
             logerr(f"MQTT connect failed with {type(exception)} and reason {exception}.")
             logerr(f"{traceback.format_exc()}")
         retries = 0
@@ -243,7 +232,7 @@ class AbstractPublisher(abc.ABC):
         self.client.loop(timeout=0.1)
         time.sleep(1)
         while not self.connected:
-            logdbg( "waiting")
+            logdbg("waiting")
             # loop seems to break before connect, perhaps due to logging
             self.client.loop(timeout=0.1)
             time.sleep(5)
@@ -256,7 +245,7 @@ class AbstractPublisher(abc.ABC):
 
             try:
                 self.connect(self.mqtt_config['host'], self.mqtt_config['port'], self.mqtt_config['keepalive'])
-            except Exception as exception: # (want to catch all) pylint: disable=broad-except
+            except Exception as exception:
                 logerr(f"MQTT connect failed with {type(exception)} and reason {exception}.")
                 logerr(f"{traceback.format_exc()}")
 
@@ -371,7 +360,7 @@ class PublisherV1(AbstractPublisher):
 
     def get_client(self, client_id, protocol):
         ''' Get the MQTT client. '''
-        return mqtt.Client(client_id=client_id, protocol=protocol) # (v1 signature) pylint: disable=no-value-for-parameter
+        return mqtt.Client(client_id=client_id, protocol=protocol)
 
     def set_callbacks(self, log_mqtt):
         ''' Setup the MQTT callbacks. '''
@@ -405,9 +394,9 @@ class PublisherV1(AbstractPublisher):
         loginf(f"Connected flags {str(flags)}")
         if self.lwt_dict:
             self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
-                                 payload=self.lwt_dict.get('online_payload', 'online'),
-                                 qos=to_int(self.lwt_dict.get('qos', 0)),
-                                 retain=to_bool(self.lwt_dict.get('retain', True)))
+                                payload=self.lwt_dict.get('online_payload', 'online'),
+                                qos=to_int(self.lwt_dict.get('qos', 0)),
+                                retain=to_bool(self.lwt_dict.get('retain', True)))
         self.connected = True
 
     def on_disconnect(self, _client, _userdata, rc):
@@ -437,10 +426,10 @@ class PublisherV2MQTT3(AbstractPublisher):
     ''' MQTTPublish that communicates with paho mqtt v2. '''
     def get_client(self, client_id, protocol):
         ''' Get the MQTT client. '''
-        return mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, # (only available in v2) pylint: disable=unexpected-keyword-arg
-                            protocol=protocol,
-                            client_id=client_id,
-                            clean_session=True)
+        return mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+                           protocol=protocol,
+                           client_id=client_id,
+                           clean_session=True)
 
     def set_callbacks(self, log_mqtt):
         ''' Setup the MQTT callbacks. '''
@@ -465,9 +454,9 @@ class PublisherV2MQTT3(AbstractPublisher):
         loginf(f"Connected flags {str(flags)}")
         if self.lwt_dict:
             self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
-                                 payload=self.lwt_dict.get('online_payload', 'online'),
-                                 qos=to_int(self.lwt_dict.get('qos', 0)),
-                                 retain=to_bool(self.lwt_dict.get('retain', True)))
+                                payload=self.lwt_dict.get('online_payload', 'online'),
+                                qos=to_int(self.lwt_dict.get('qos', 0)),
+                                retain=to_bool(self.lwt_dict.get('retain', True)))
         self.connected = True
 
     def on_disconnect(self, _client, _userdata, _flags, reason_code, _properties):
@@ -498,9 +487,9 @@ class PublisherV2(AbstractPublisher):
     ''' MQTTPublish that communicates with paho mqtt v2. '''
     def get_client(self, client_id, protocol):
         ''' Get the MQTT client. '''
-        return mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, # (only available in v2) pylint: disable=unexpected-keyword-arg
-                            protocol=protocol,
-                            client_id=client_id)
+        return mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+                           protocol=protocol,
+                           client_id=client_id)
 
     def set_callbacks(self, log_mqtt):
         ''' Setup the MQTT callbacks. '''
@@ -525,9 +514,9 @@ class PublisherV2(AbstractPublisher):
         loginf(f"Connected flags {str(flags)}")
         if self.lwt_dict:
             self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
-                                 payload=self.lwt_dict.get('online_payload', 'online'),
-                                 qos=to_int(self.lwt_dict.get('qos', 0)),
-                                 retain=to_bool(self.lwt_dict.get('retain', True)))
+                                payload=self.lwt_dict.get('online_payload', 'online'),
+                                qos=to_int(self.lwt_dict.get('qos', 0)),
+                                retain=to_bool(self.lwt_dict.get('retain', True)))
         self.connected = True
 
     def on_disconnect(self, _client, _userdata, _flags, reason_code, _properties):
@@ -560,7 +549,7 @@ class PublishWeeWX():
     def __init__(self, engine, config_dict):
         self.mqtt_publish = MQTTPublish(engine, config_dict)
 
-    def shutDown(self): # need to override parent - pylint: disable=invalid-name
+    def shutDown(self):
         """Run when an engine shutdown is requested."""
         self.mqtt_publish.shutDown()
 
@@ -595,7 +584,7 @@ class MQTTPublish(StdService):
         self.mqtt_config['keepalive'] = to_int(service_dict.get('keepalive', 60))
 
         self.mqtt_config['max_retries'] = to_int(service_dict.get('max_retries', 5))
-        #self.mqtt_config['retry_wait'] = to_int(service_dict.get('retry_wait', 5))
+        # self.mqtt_config['retry_wait'] = to_int(service_dict.get('retry_wait', 5))
         self.mqtt_config['log_mqtt'] = to_bool(service_dict.get('log', False))
         self.mqtt_config['host'] = service_dict.get('host', 'localhost')
         self.mqtt_config['port'] = to_int(service_dict.get('port', 1883))
@@ -628,7 +617,13 @@ class MQTTPublish(StdService):
         self._thread = PublishWeeWXThread(self.mqtt_config, self.topics_loop, self.topics_archive, self.data_queue)
         self.thread_start()
 
-    def configure_fields(self, fields_dict, ignore, publish_none_value, append_unit_label, conversion_type, format_string):
+    def configure_fields(self,
+                         fields_dict,
+                         ignore,
+                         publish_none_value,
+                         append_unit_label,
+                         conversion_type,
+                         format_string):
         """ Configure the fields. """
         # pylint: disable=too-many-arguments
         fields = {}
@@ -643,7 +638,7 @@ class MQTTPublish(StdService):
             fields[field]['conversion_type'] = field_dict.get('conversion_type', conversion_type)
             fields[field]['format_string'] = field_dict.get('format_string', format_string)
 
-        #logdbg("Configured fields: %s" % fields)
+        # logdbg("Configured fields: %s" % fields)
         return fields
 
     def configure_topics(self, service_dict):
@@ -682,7 +677,12 @@ class MQTTPublish(StdService):
             fields_dict = topic_dict.get('fields', None)
             fields = {}
             if fields_dict is not None:
-                fields = self.configure_fields(fields_dict, ignore, publish_none_value, append_unit_label, conversion_type, format_string)
+                fields = self.configure_fields(fields_dict,
+                                               ignore,
+                                               publish_none_value,
+                                               append_unit_label,
+                                               conversion_type,
+                                               format_string)
 
             aggregates = topic_dict.get('aggregates', {})
             if aggregates:
@@ -696,7 +696,7 @@ class MQTTPublish(StdService):
                                                                               conversion_type,
                                                                               format_string))
 
-            #logdbg("Configured aggregates: %s" % aggregates)
+            # logdbg("Configured aggregates: %s" % aggregates)
 
             if 'loop' in binding:
                 if not publish:
@@ -745,7 +745,7 @@ class MQTTPublish(StdService):
         # ToDo - configure how long to wait for thread to start
         self.thread_start_wait = 5.0
         loginf("joining thread")
-        #self._thread.join(self.thread_start_wait)
+        # self._thread.join(self.thread_start_wait)
         loginf("joined thread")
 
         if not self._thread.is_alive():
@@ -766,7 +766,8 @@ class MQTTPublish(StdService):
         if not self._thread.is_alive():
             if self.thread_restarts < self.max_thread_restarts:
                 self.thread_restarts += 1
-                self._thread = PublishWeeWXThread(self.mqtt_config, self.topics_loop, self.topics_archive, self.data_queue)
+                self._thread = \
+                    PublishWeeWXThread(self.mqtt_config, self.topics_loop, self.topics_archive, self.data_queue)
                 self.thread_start()
 
                 self.data_queue.put({'time_stamp': data['dateTime'], 'type': data_type, 'data': data})
@@ -777,7 +778,7 @@ class MQTTPublish(StdService):
             self.data_queue.put({'time_stamp': data['dateTime'], 'type': data_type, 'data': data})
             self._thread.threading_event.set()
 
-    def shutDown(self): # need to override parent - pylint: disable=invalid-name
+    def shutDown(self):  # need to override parent - pylint: disable=invalid-name
         """Run when an engine shutdown is requested."""
         loginf("SHUTDOWN - initiated")
         if self._thread:
@@ -810,7 +811,7 @@ class PublishWeeWXThread(threading.Thread):
         'uv_index': None,
         'percent': None,
         'unix_epoch': None,
-        }
+    }
 
     def __init__(self, mqtt_config, topics_loop, topics_archive, data_queue):
         threading.Thread.__init__(self)
@@ -844,7 +845,11 @@ class PublishWeeWXThread(threading.Thread):
             if updated_record[field] is None and not publish_none_value:
                 continue
 
-            (name, value) = self.update_field(topic_dict, fieldinfo, field, updated_record[field], updated_record['usUnits'])
+            (name, value) = self.update_field(topic_dict,
+                                              fieldinfo,
+                                              field,
+                                              updated_record[field],
+                                              updated_record['usUnits'])
             final_record[name] = value
 
         for aggregate_observation in topic_dict['aggregates']:
@@ -853,17 +858,18 @@ class PublishWeeWXThread(threading.Thread):
             time_span = period_timespan[topic_dict['aggregates'][aggregate_observation]['period']](record['dateTime'])
 
             try:
-                aggregate_value_tuple = weewx.xtypes.get_aggregate(topic_dict['aggregates'][aggregate_observation]['observation'],
-                                                                time_span, topic_dict['aggregates'][aggregate_observation]['aggregation'],
-                                                                self.db_manager)
+                aggregate_value_tuple = \
+                    weewx.xtypes.get_aggregate(topic_dict['aggregates'][aggregate_observation]['observation'],
+                                               time_span, topic_dict['aggregates'][aggregate_observation]['aggregation'],
+                                               self.db_manager)
                 aggregate_value = weewx.units.convertStd(aggregate_value_tuple, record['usUnits'])[0]
                 # ToDo: only do once?
                 weewx.units.obs_group_dict[aggregate_observation] = aggregate_value_tuple[2]
 
                 (name, value) = self.update_field(topic_dict, topic_dict['aggregates'][aggregate_observation],
-                                        aggregate_observation,
-                                        aggregate_value,
-                                        updated_record['usUnits'])
+                                                  aggregate_observation,
+                                                  aggregate_value,
+                                                  updated_record['usUnits'])
 
                 # ToDo: check if observation already in record
                 final_record[name] = value
@@ -913,26 +919,26 @@ class PublishWeeWXThread(threading.Thread):
             if topics[topic]['type'] == 'json':
                 updated_record = self.update_record(topics[topic], record)
                 self.publisher.publish_message(time_stamp,
-                                                  topics[topic]['qos'],
-                                                  topics[topic]['retain'],
-                                                  topic,
-                                                  json.dumps(updated_record))
+                                               topics[topic]['qos'],
+                                               topics[topic]['retain'],
+                                               topic,
+                                               json.dumps(updated_record))
             if topics[topic]['type'] == 'keyword':
                 updated_record = self.update_record(topics[topic], record)
                 data_keyword = ', '.join(f"{key}={val}" for (key, val) in updated_record.items())
                 self.publisher.publish_message(time_stamp,
-                                                  topics[topic]['qos'],
-                                                  topics[topic]['retain'],
-                                                  topic,
-                                                  data_keyword)
+                                               topics[topic]['qos'],
+                                               topics[topic]['retain'],
+                                               topic,
+                                               data_keyword)
             if topics[topic]['type'] == 'individual':
                 updated_record = self.update_record(topics[topic], record)
                 for key, value in updated_record.items():
                     self.publisher.publish_message(time_stamp,
-                                                      topics[topic]['qos'],
-                                                      topics[topic]['retain'],
-                                                      topic + '/' + key,
-                                                      value)
+                                                   topics[topic]['qos'],
+                                                   topics[topic]['retain'],
+                                                   topic + '/' + key,
+                                                   value)
 
     def run(self):
         self.running = True
@@ -959,7 +965,7 @@ class PublishWeeWXThread(threading.Thread):
                 # does cause a socket error/disconnect message on the server
                 self.publisher.client.loop(timeout=0.1)
                 # ToDo - investigate my 'sleep' implementation
-                self.threading_event.wait(self.mqtt_config['keepalive']/4)
+                self.threading_event.wait(self.mqtt_config['keepalive'] / 4)
                 self.threading_event.clear()
 
         loginf("exited loop")
