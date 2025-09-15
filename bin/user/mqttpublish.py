@@ -1030,6 +1030,5 @@ if __name__ == "__main__":
         # ToDo: Need better solution than sleeping
         time.sleep(3)
         mqtt_publish.shutDown()
-        return
 
     main()
