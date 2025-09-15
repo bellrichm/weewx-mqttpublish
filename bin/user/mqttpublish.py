@@ -832,8 +832,8 @@ class PublishWeeWXThread(threading.Thread):
     def update_record(self, topic_dict, record):
         """ Update the record. """
         final_record = {}
-        if topic_dict['unit_system'] is not None:
-            updated_record = weewx.units.to_std_system(record, topic_dict['unit_system'])
+        updated_record = weewx.units.to_std_system(record, topic_dict['unit_system'])
+
         for field in updated_record:
             fieldinfo = topic_dict['fields'].get(field, {})
             ignore = fieldinfo.get('ignore', topic_dict.get('ignore'))
