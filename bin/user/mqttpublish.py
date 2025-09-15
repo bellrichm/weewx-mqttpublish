@@ -422,67 +422,6 @@ class PublisherV1(AbstractPublisher):
         qos = ""
         logdbg(f"Published  ({int(time.time())}): {time_stamp} {mid} {qos}")
 
-class PublisherV2MQTT3(AbstractPublisher):
-    ''' MQTTPublish that communicates with paho mqtt v2. '''
-    def get_client(self, client_id, protocol):
-        ''' Get the MQTT client. '''
-        return mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-                           protocol=protocol,
-                           client_id=client_id,
-                           clean_session=True)
-
-    def set_callbacks(self, log_mqtt):
-        ''' Setup the MQTT callbacks. '''
-        if log_mqtt:
-            self.client.on_log = self.on_log
-
-        self.client.on_connect = self.on_connect
-        self.client.on_disconnect = self.on_disconnect
-        self.client.on_publish = self.on_publish
-
-    def connect(self, host, port, keepalive):
-        ''' Connect to the MQTT server. '''
-        self.client.connect(host=host, port=port, keepalive=keepalive)
-
-    def on_log(self, _client, _userdata, level, msg):
-        """ The on_log callback. """
-        self.mqtt_logger[level](f"MQTT log: {msg}")
-
-    def on_connect(self, _client, _userdata, flags, reason_code, _properties):
-        """ The on_connect callback. """
-        loginf(f"Connected with result code {int(int(reason_code.value))}")
-        loginf(f"Connected flags {str(flags)}")
-        if self.lwt_dict:
-            self.client.publish(topic=self.lwt_dict.get('topic', 'status'),
-                                payload=self.lwt_dict.get('online_payload', 'online'),
-                                qos=to_int(self.lwt_dict.get('qos', 0)),
-                                retain=to_bool(self.lwt_dict.get('retain', True)))
-        self.connected = True
-
-    def on_disconnect(self, _client, _userdata, _flags, reason_code, _properties):
-        """ The on_disconnect callback. """
-        # https://pypi.org/project/paho-mqtt/#on-discconnect
-        # The rc parameter indicates the disconnection state.
-        # If MQTT_ERR_SUCCESS (0), the callback was called in response to a disconnect() call.
-        # If any other value the disconnection was unexpected,
-        # such as might be caused by a network error.
-        if int(reason_code.value) == 0:
-            loginf(f"Disconnected with result code {int(int(reason_code.value))}")
-        else:
-            logerr(f"Disconnected with result code {int(int(reason_code.value))}")
-
-        # ToDo: research how it works with v2
-        # As of 1.6.1, Paho MQTT cannot have a callback invoke a second callback. So we won't attempt to reconnect here.
-        # Because that would cause the on_connect callback to be called. Instead we will just mark as not connected.
-        # And check the flag before attempting to publish.
-        self.connected = False
-
-    def on_publish(self, _client, _userdata, mid, _reason_codes, _properties):
-        """ The on_publish callback. """
-        time_stamp = "          "
-        qos = ""
-        logdbg(f"Published  ({int(time.time())}): {time_stamp} {mid} {qos}")
-
 class PublisherV2(AbstractPublisher):
     ''' MQTTPublish that communicates with paho mqtt v2. '''
     def get_client(self, client_id, protocol):
@@ -543,6 +482,27 @@ class PublisherV2(AbstractPublisher):
         qos = ""
         logdbg(f"Published  ({int(time.time())}): {time_stamp} {mid} {qos}")
 
+class PublisherV2MQTT3(PublisherV2):
+    ''' MQTTPublish that communicates with paho mqtt v2. '''
+    def get_client(self, client_id, protocol):
+        ''' Get the MQTT client. '''
+        return mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+                           protocol=protocol,
+                           client_id=client_id,
+                           clean_session=True)
+
+    def set_callbacks(self, log_mqtt):
+        ''' Setup the MQTT callbacks. '''
+        if log_mqtt:
+            self.client.on_log = self.on_log
+
+        self.client.on_connect = self.on_connect
+        self.client.on_disconnect = self.on_disconnect
+        self.client.on_publish = self.on_publish
+
+    def connect(self, host, port, keepalive):
+        ''' Connect to the MQTT server. '''
+        self.client.connect(host=host, port=port, keepalive=keepalive)
 
 class PublishWeeWX():
     """ Backwards compatibility class."""
