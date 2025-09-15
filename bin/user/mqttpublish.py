@@ -177,7 +177,7 @@ period_timespan = {
 
 class AbstractPublisher(abc.ABC):
     """ Managing publishing to MQTT. """
-    def __init__(self, publisher, service_dict):
+    def __init__(self, publisher, mqtt_config):
         self.connected = False
         self.mqtt_logger = {
             mqtt.MQTT_LOG_INFO: loginf,
@@ -189,18 +189,16 @@ class AbstractPublisher(abc.ABC):
 
         self.publisher = publisher
 
-        self.max_retries = to_int(service_dict.get('max_retries', 5))
-        self.retry_wait = to_int(service_dict.get('retry_wait', 5))
-        log_mqtt = to_bool(service_dict.get('log', False))
-        self.host = service_dict.get('host', 'localhost')
-        self.keepalive = to_int(service_dict.get('keepalive', 60))
-        self.port = to_int(service_dict.get('port', 1883))
-        username = service_dict.get('username', None)
-        password = service_dict.get('password', None)
-        clientid = service_dict.get('clientid', 'MQTTPublish-' + str(random.randint(1000, 9999)))
-
-        protocol_string = service_dict.get('protocol', 'MQTTv311')
-        self.protocol = getattr(mqtt, protocol_string, 0)
+        self.max_retries = mqtt_config['max_retries']
+        self.retry_wait = mqtt_config['retry_wait']
+        log_mqtt = mqtt_config['log_mqtt']
+        self.host = mqtt_config['host']
+        self.keepalive = mqtt_config['keepalive']
+        self.port = mqtt_config['port']
+        username = mqtt_config['username']
+        password = mqtt_config['password']
+        clientid = mqtt_config['clientid']
+        self.protocol = mqtt_config['protocol']
 
         loginf(f"host is {self.host}")
         loginf(f"port is {self.port}")
@@ -219,11 +217,11 @@ class AbstractPublisher(abc.ABC):
         if username is not None and password is not None:
             self.client.username_pw_set(username, password)
 
-        tls_dict = service_dict.get('tls')
+        tls_dict = mqtt_config.get('tls')
         if tls_dict:
             self.config_tls(tls_dict)
 
-        self.lwt_dict = service_dict.get('lwt')
+        self.lwt_dict = mqtt_config.get('lwt')
         if self.lwt_dict:
             self.client.will_set(topic=self.lwt_dict.get('topic', 'status'),
                                  payload=self.lwt_dict.get('offline_payload', 'offline'),
@@ -233,17 +231,16 @@ class AbstractPublisher(abc.ABC):
         self._connect()
 
     @classmethod
-    def get_publisher(cls, publisher, service_dict):
+    def get_publisher(cls, publisher, mqtt_config):
         ''' Factory method to get appropriate MQTTPublish for paho mqtt version. '''
         if hasattr(mqtt, 'CallbackAPIVersion'):
-            protocol_string = service_dict.get('protocol', 'MQTTv311')
-            protocol = getattr(mqtt, protocol_string, 0)
+            protocol = mqtt_config['protocol']
             if protocol in [mqtt.MQTTv31, mqtt.MQTTv311]:
-                return PublisherV2MQTT3(publisher, service_dict)
+                return PublisherV2MQTT3(publisher, mqtt_config)
 
-            return PublisherV2(publisher, service_dict)
+            return PublisherV2(publisher, mqtt_config)
 
-        return PublisherV1(publisher, service_dict)
+        return PublisherV1(publisher, mqtt_config)
 
     def _connect(self):
         try:
@@ -375,13 +372,12 @@ class AbstractPublisher(abc.ABC):
 
 class PublisherV1(AbstractPublisher):
     ''' MQTTPublish that communicates with paho mqtt v1.'''
-    def __init__(self, publisher, service_dict):
-        protocol_string = service_dict.get('protocol', 'MQTTv311')
-        protocol = getattr(mqtt, protocol_string, 0)
+    def __init__(self, publisher, mqtt_config):
+        protocol = mqtt_config['protocol']
         if protocol not in [mqtt.MQTTv31, mqtt.MQTTv311]:
-            raise ValueError(f"Invalid protocol, {protocol_string}.")
+            raise ValueError(f"Invalid protocol, {protocol}.")
 
-        super().__init__(publisher, service_dict)
+        super().__init__(publisher, mqtt_config)
 
     def get_client(self, client_id, protocol):
         ''' Get the MQTT client. '''
@@ -585,24 +581,43 @@ class MQTTPublish(StdService):
 
         logdbg(f" native id in 'main' init {threading.get_native_id()}")
 
-        self.service_dict = config_dict.get('MQTTPublish', {})
+        service_dict = config_dict.get('MQTTPublish', {})
 
         exclude_keys = ['password']
-        sanitized_service_dict = {k: self.service_dict[k] for k in set(list(self.service_dict.keys())) - set(exclude_keys)}
+        sanitized_service_dict = {k: service_dict[k] for k in set(list(service_dict.keys())) - set(exclude_keys)}
         logdbg(f"sanitized configuration removed {exclude_keys}")
         logdbg(f"sanitized_service_dict is {sanitized_service_dict}")
 
         #  backwards compatability
-        if 'PublishWeeWX' in self.service_dict.sections:
+        if 'PublishWeeWX' in service_dict.sections:
             logerr("'PublishWeeWX' is deprecated. Move options to top level, '[MQTTPublish]'.")
-            self.service_dict = config_dict.get('MQTTPublish', {}).get('PublishWeeWX', {})
+            service_dict = config_dict.get('MQTTPublish', {}).get('PublishWeeWX', {})
 
-        self.enable = to_bool(self.service_dict.get('enable', True))
+        self.enable = to_bool(service_dict.get('enable', True))
         if not self.enable:
             loginf("Not enabled, exiting.")
             return
 
-        self.topics_loop, self.topics_archive = self.configure_topics(self.service_dict)
+        self.topics_loop, self.topics_archive = self.configure_topics(service_dict)
+
+        self.mqtt_config = {}
+        self.mqtt_config['wait_before_retry'] = float(service_dict.get('wait_before_retry', 2))
+        self.mqtt_config['keepalive'] = to_int(service_dict.get('keepalive', 60))
+
+        self.mqtt_config['max_retries'] = to_int(service_dict.get('max_retries', 5))
+        self.mqtt_config['retry_wait'] = to_int(service_dict.get('retry_wait', 5))
+        self.mqtt_config['log_mqtt'] = to_bool(service_dict.get('log', False))
+        self.mqtt_config['host'] = service_dict.get('host', 'localhost')
+        self.mqtt_config['port'] = to_int(service_dict.get('port', 1883))
+        self.mqtt_config['username'] = service_dict.get('username', None)
+        self.mqtt_config['password'] = service_dict.get('password', None)
+        self.mqtt_config['clientid'] = service_dict.get('clientid', 'MQTTPublish-' + str(random.randint(1000, 9999)))
+
+        protocol_string = service_dict.get('protocol', 'MQTTv311')
+        self.mqtt_config['protocol'] = getattr(mqtt, protocol_string, 0)
+
+        self.mqtt_config['tls'] = service_dict.get('tls')
+        self.mqtt_config['lwt'] = service_dict.get('lwt')
 
         # todo - make configurable
         self.kill_weewx = []
@@ -610,7 +625,7 @@ class MQTTPublish(StdService):
         self.thread_restarts = 0
 
         # todo, tie this into the topic bindings somehow...
-        binding = weeutil.weeutil.option_as_list(self.service_dict.get('binding', ['archive', 'loop']))
+        binding = weeutil.weeutil.option_as_list(service_dict.get('binding', ['archive', 'loop']))
 
         self.data_queue = Queue.Queue()
 
@@ -620,7 +635,7 @@ class MQTTPublish(StdService):
         if 'archive' in binding:
             self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
 
-        self._thread = PublishWeeWXThread(self.service_dict, self.topics_loop, self.topics_archive, self.data_queue)
+        self._thread = PublishWeeWXThread(self.mqtt_config, self.topics_loop, self.topics_archive, self.data_queue)
         self.thread_start()
 
     def configure_fields(self, fields_dict, ignore, publish_none_value, append_unit_label, conversion_type, format_string):
@@ -761,7 +776,7 @@ class MQTTPublish(StdService):
         if not self._thread.is_alive():
             if self.thread_restarts < self.max_thread_restarts:
                 self.thread_restarts += 1
-                self._thread = PublishWeeWXThread(self.service_dict, self.topics_loop, self.topics_archive, self.data_queue)
+                self._thread = PublishWeeWXThread(self.mqtt_config, self.topics_loop, self.topics_archive, self.data_queue)
                 self.thread_start()
 
                 self.data_queue.put({'time_stamp': data['dateTime'], 'type': data_type, 'data': data})
@@ -807,7 +822,7 @@ class PublishWeeWXThread(threading.Thread):
         'unix_epoch': None,
         }
 
-    def __init__(self, service_dict, topics_loop, topics_archive, data_queue):
+    def __init__(self, mqtt_config, topics_loop, topics_archive, data_queue):
         threading.Thread.__init__(self)
 
         logdbg(f" native id in init {threading.get_native_id()}")
@@ -817,14 +832,9 @@ class PublishWeeWXThread(threading.Thread):
 
         self.db_manager = None
 
-        self.service_dict = service_dict
+        self.mqtt_config = mqtt_config
         self.topics_loop = topics_loop
         self.topics_archive = topics_archive
-
-        self.wait_before_retry = float(self.service_dict.get('wait_before_retry', 2))
-        self.keepalive = to_int(self.service_dict.get('keepalive', 60))
-
-        loginf(f"Wait before retry is {int(self.wait_before_retry)}")
 
         self.data_queue = data_queue
         self.threading_event = threading.Event()
@@ -940,7 +950,7 @@ class PublishWeeWXThread(threading.Thread):
         logdbg(f" native id in run {threading.get_native_id()}")
 
         # need to instantiate inside thread
-        self.publisher = AbstractPublisher.get_publisher(self, self.service_dict)
+        self.publisher = AbstractPublisher.get_publisher(self, self.mqtt_config)
 
         while self.running:
             try:
@@ -959,7 +969,7 @@ class PublishWeeWXThread(threading.Thread):
                 # does cause a socket error/disconnect message on the server
                 self.publisher.client.loop(timeout=0.1)
                 # ToDo - investigate my 'sleep' implementation
-                self.threading_event.wait(self.keepalive/4)
+                self.threading_event.wait(self.mqtt_config['keepalive']/4)
                 self.threading_event.clear()
 
         loginf("exited loop")
