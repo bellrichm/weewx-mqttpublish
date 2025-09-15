@@ -649,8 +649,8 @@ class MQTTPublish(StdService):
     def configure_topics(self, service_dict):
         """ Configure the topics. """
         # pylint: disable=too-many-locals, too-many-statements
-        topics_dict = service_dict.get('topics', None)
-        if topics_dict is None:
+        topic_dict = service_dict.get('topics', None)
+        if topic_dict is None:
             raise ValueError("[[topics]] is required.")
 
         default_qos = to_int(service_dict.get('qos', 0))
@@ -664,8 +664,8 @@ class MQTTPublish(StdService):
 
         topics_loop = {}
         topics_archive = {}
-        for topic in topics_dict.sections:
-            topic_dict = topics_dict.get(topic, {})
+        for topic in topic_dict.sections:
+            topic_dict = topic_dict.get(topic, {})
             publish = to_bool(topic_dict.get('publish', True))
             qos = to_int(topic_dict.get('qos', default_qos))
             retain = to_bool(topic_dict.get('retain', default_retain))
