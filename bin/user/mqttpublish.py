@@ -586,6 +586,12 @@ class MQTTPublish(StdService):
         logdbg(f" native id in 'main' init {threading.get_native_id()}")
 
         self.service_dict = config_dict.get('MQTTPublish', {})
+
+        exclude_keys = ['password']
+        sanitized_service_dict = {k: self.service_dict[k] for k in set(list(self.service_dict.keys())) - set(exclude_keys)}
+        logdbg(f"sanitized configuration removed {exclude_keys}")
+        logdbg(f"sanitized_service_dict is {sanitized_service_dict}")
+
         #  backwards compatability
         if 'PublishWeeWX' in self.service_dict.sections:
             logerr("'PublishWeeWX' is deprecated. Move options to top level, '[MQTTPublish]'.")
@@ -595,6 +601,8 @@ class MQTTPublish(StdService):
         if not self.enable:
             loginf("Not enabled, exiting.")
             return
+
+        self.topics_loop, self.topics_archive = self.configure_topics(self.service_dict)
 
         # todo - make configurable
         self.kill_weewx = []
@@ -612,108 +620,8 @@ class MQTTPublish(StdService):
         if 'archive' in binding:
             self.bind(weewx.NEW_ARCHIVE_RECORD, self.new_archive_record)
 
-        self._thread = PublishWeeWXThread(self.service_dict, self.data_queue)
+        self._thread = PublishWeeWXThread(self.service_dict, self.topics_loop, self.topics_archive, self.data_queue)
         self.thread_start()
-
-    def thread_start(self):
-        """Start the publishing thread."""
-        loginf("starting thread")
-        self._thread.start()
-        # ToDo - configure how long to wait for thread to start
-        self.thread_start_wait = 5.0
-        loginf("joining thread")
-        #self._thread.join(self.thread_start_wait)
-        loginf("joined thread")
-
-        if not self._thread.is_alive():
-            loginf("oh no")
-            raise weewx.WakeupError("Unable to start MQTT publishing thread.")
-
-        loginf("started thread")
-
-    def new_loop_packet(self, event):
-        """ Handle loop packets. """
-        self._handle_record('loop', event.packet)
-
-    def new_archive_record(self, event):
-        """ Handle archive records. """
-        self._handle_record('archive', event.record)
-
-    def _handle_record(self, data_type, data):
-        if not self._thread.is_alive():
-            if self.thread_restarts < self.max_thread_restarts:
-                self.thread_restarts += 1
-                self._thread = PublishWeeWXThread(self.service_dict, self.data_queue)
-                self.thread_start()
-
-                self.data_queue.put({'time_stamp': data['dateTime'], 'type': data_type, 'data': data})
-                self._thread.threading_event.set()
-            elif 'threadEnded' in self.kill_weewx:
-                raise weewx.StopNow("MQTT publishing thread has stopped.")
-        else:
-            self.data_queue.put({'time_stamp': data['dateTime'], 'type': data_type, 'data': data})
-            self._thread.threading_event.set()
-
-    def shutDown(self): # need to override parent - pylint: disable=invalid-name
-        """Run when an engine shutdown is requested."""
-        loginf("SHUTDOWN - initiated")
-        if self._thread:
-            loginf("SHUTDOWN - thread initiated")
-            self._thread.running = False
-            self._thread.threading_event.set()
-            self._thread.join(20.0)
-            if self._thread.is_alive():
-                logerr(f"Unable to shut down {self._thread.name} thread")
-
-            self._thread = None
-
-class PublishWeeWXThread(threading.Thread):
-    """Publish WeeWX data to MQTT. """
-    # pylint: disable=too-many-instance-attributes
-    UNIT_REDUCTIONS = {
-        'degree_F': 'F',
-        'degree_C': 'C',
-        'inch': 'in',
-        'mile_per_hour': 'mph',
-        'mile_per_hour2': 'mph',
-        'km_per_hour': 'kph',
-        'km_per_hour2': 'kph',
-        'knot': 'knot',
-        'knot2': 'knot2',
-        'meter_per_second': 'mps',
-        'meter_per_second2': 'mps',
-        'degree_compass': None,
-        'watt_per_meter_squared': 'Wpm2',
-        'uv_index': None,
-        'percent': None,
-        'unix_epoch': None,
-        }
-    def __init__(self, service_dict, data_queue):
-        threading.Thread.__init__(self)
-
-        logdbg(f" native id in init {threading.get_native_id()}")
-
-        self.publisher = None
-        self.running = False
-
-        self.db_manager = None
-
-        self.service_dict = service_dict
-
-        exclude_keys = ['password']
-        sanitized_service_dict = {k: self.service_dict[k] for k in set(list(self.service_dict.keys())) - set(exclude_keys)}
-        logdbg(f"sanitized configuration removed {exclude_keys}")
-        logdbg(f"sanitized_service_dict is {sanitized_service_dict}")
-
-        self.topics_loop, self.topics_archive = self.configure_topics(self.service_dict)
-        self.wait_before_retry = float(self.service_dict.get('wait_before_retry', 2))
-        self.keepalive = to_int(self.service_dict.get('keepalive', 60))
-
-
-        loginf(f"Wait before retry is {int(self.wait_before_retry)}")
-
-        self.data_queue = data_queue
-        self.threading_event = threading.Event()
 
     def configure_fields(self, fields_dict, ignore, publish_none_value, append_unit_label, conversion_type, format_string):
         """ Configure the fields. """
@@ -824,6 +732,102 @@ class PublishWeeWXThread(threading.Thread):
         logdbg(f"Loop topics: {topics_loop}")
         logdbg(f"Archive topics: {topics_archive}")
         return topics_loop, topics_archive
+
+    def thread_start(self):
+        """Start the publishing thread."""
+        loginf("starting thread")
+        self._thread.start()
+        # ToDo - configure how long to wait for thread to start
+        self.thread_start_wait = 5.0
+        loginf("joining thread")
+        #self._thread.join(self.thread_start_wait)
+        loginf("joined thread")
+
+        if not self._thread.is_alive():
+            loginf("oh no")
+            raise weewx.WakeupError("Unable to start MQTT publishing thread.")
+
+        loginf("started thread")
+
+    def new_loop_packet(self, event):
+        """ Handle loop packets. """
+        self._handle_record('loop', event.packet)
+
+    def new_archive_record(self, event):
+        """ Handle archive records. """
+        self._handle_record('archive', event.record)
+
+    def _handle_record(self, data_type, data):
+        if not self._thread.is_alive():
+            if self.thread_restarts < self.max_thread_restarts:
+                self.thread_restarts += 1
+                self._thread = PublishWeeWXThread(self.service_dict, self.topics_loop, self.topics_archive, self.data_queue)
+                self.thread_start()
+
+                self.data_queue.put({'time_stamp': data['dateTime'], 'type': data_type, 'data': data})
+                self._thread.threading_event.set()
+            elif 'threadEnded' in self.kill_weewx:
+                raise weewx.StopNow("MQTT publishing thread has stopped.")
+        else:
+            self.data_queue.put({'time_stamp': data['dateTime'], 'type': data_type, 'data': data})
+            self._thread.threading_event.set()
+
+    def shutDown(self): # need to override parent - pylint: disable=invalid-name
+        """Run when an engine shutdown is requested."""
+        loginf("SHUTDOWN - initiated")
+        if self._thread:
+            loginf("SHUTDOWN - thread initiated")
+            self._thread.running = False
+            self._thread.threading_event.set()
+            self._thread.join(20.0)
+            if self._thread.is_alive():
+                logerr(f"Unable to shut down {self._thread.name} thread")
+
+            self._thread = None
+
+class PublishWeeWXThread(threading.Thread):
+    """Publish WeeWX data to MQTT. """
+    # pylint: disable=too-many-instance-attributes
+    UNIT_REDUCTIONS = {
+        'degree_F': 'F',
+        'degree_C': 'C',
+        'inch': 'in',
+        'mile_per_hour': 'mph',
+        'mile_per_hour2': 'mph',
+        'km_per_hour': 'kph',
+        'km_per_hour2': 'kph',
+        'knot': 'knot',
+        'knot2': 'knot2',
+        'meter_per_second': 'mps',
+        'meter_per_second2': 'mps',
+        'degree_compass': None,
+        'watt_per_meter_squared': 'Wpm2',
+        'uv_index': None,
+        'percent': None,
+        'unix_epoch': None,
+        }
+
+    def __init__(self, service_dict, topics_loop, topics_archive, data_queue):
+        threading.Thread.__init__(self)
+
+        logdbg(f" native id in init {threading.get_native_id()}")
+
+        self.publisher = None
+        self.running = False
+
+        self.db_manager = None
+
+        self.service_dict = service_dict
+        self.topics_loop = topics_loop
+        self.topics_archive = topics_archive
+
+        self.wait_before_retry = float(self.service_dict.get('wait_before_retry', 2))
+        self.keepalive = to_int(self.service_dict.get('keepalive', 60))
+
+        loginf(f"Wait before retry is {int(self.wait_before_retry)}")
+
+        self.data_queue = data_queue
+        self.threading_event = threading.Event()
 
     def update_record(self, topic_dict, record):
         """ Update the record. """
