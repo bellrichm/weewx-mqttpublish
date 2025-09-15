@@ -491,15 +491,6 @@ class PublisherV2MQTT3(PublisherV2):
                            client_id=client_id,
                            clean_session=True)
 
-    def set_callbacks(self, log_mqtt):
-        ''' Setup the MQTT callbacks. '''
-        if log_mqtt:
-            self.client.on_log = self.on_log
-
-        self.client.on_connect = self.on_connect
-        self.client.on_disconnect = self.on_disconnect
-        self.client.on_publish = self.on_publish
-
     def connect(self, host, port, keepalive):
         ''' Connect to the MQTT server. '''
         self.client.connect(host=host, port=port, keepalive=keepalive)
