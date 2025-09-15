@@ -154,7 +154,6 @@ def logerr(msg):
     log.error(msg)
 
 # need to rethink
-# pylint: disable=unnecessary-lambda
 period_timespan = {
     'hour': lambda time_stamp: weeutil.weeutil.archiveHoursAgoSpan(time_stamp),
     'day': lambda time_stamp: weeutil.weeutil.archiveDaySpan(time_stamp),
@@ -173,7 +172,6 @@ period_timespan = {
                                                time.mktime((datetime.date.fromtimestamp(time_stamp) -
                                                             datetime.timedelta(days=366)).timetuple()))
 }
-# pylint: enable=unnecessary-lambda
 
 class AbstractPublisher(abc.ABC):
     """ Managing publishing to MQTT. """
@@ -329,7 +327,6 @@ class AbstractPublisher(abc.ABC):
 
     def publish_message(self, time_stamp, qos, retain, topic, data):
         """ Publish the message. """
-        # pylint: disable=too-many-arguments
         if not self.connected:
             self._reconnect()
         mqtt_message_info = self.client.publish(topic, data, qos=qos, retain=retain)
@@ -575,7 +572,6 @@ class MQTTPublish(StdService):
                          conversion_type,
                          format_string):
         """ Configure the fields. """
-        # pylint: disable=too-many-arguments
         fields = {}
         for field in fields_dict.sections:
             fields[field] = {}
@@ -593,7 +589,6 @@ class MQTTPublish(StdService):
 
     def configure_topics(self, service_dict):
         """ Configure the topics. """
-        # pylint: disable=too-many-locals, too-many-statements
         topic_dict = service_dict.get('topics', None)
         if topic_dict is None:
             raise ValueError("[[topics]] is required.")
@@ -728,7 +723,7 @@ class MQTTPublish(StdService):
             self.data_queue.put({'time_stamp': data['dateTime'], 'type': data_type, 'data': data})
             self._thread.threading_event.set()
 
-    def shutDown(self):  # need to override parent - pylint: disable=invalid-name
+    def shutDown(self):
         """Run when an engine shutdown is requested."""
         loginf("SHUTDOWN - initiated")
         if self._thread:
@@ -743,7 +738,6 @@ class MQTTPublish(StdService):
 
 class PublishWeeWXThread(threading.Thread):
     """Publish WeeWX data to MQTT. """
-    # pylint: disable=too-many-instance-attributes
     UNIT_REDUCTIONS = {
         'degree_F': 'F',
         'degree_C': 'C',
@@ -833,7 +827,6 @@ class PublishWeeWXThread(threading.Thread):
     @staticmethod
     def update_field(topic_dict, fieldinfo, field, value, unit_system):
         """ Update field. """
-        # pylint: disable=too-many-locals
         name = fieldinfo.get('name', field)
         append_unit_label = fieldinfo.get('append_unit_label', topic_dict.get('append_unit_label'))
         if append_unit_label:
