@@ -13,5 +13,6 @@
     //"python.linting.flake8CategorySeverity.F": "Error",
     "//python.linting.flake8CategorySeverity.E": "Error",
 
+    "sonarlint.disableTelemetry":true,
 
 }
