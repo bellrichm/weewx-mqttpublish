@@ -1,0 +1,5 @@
+[flake8]
+max-line-length = 120
+
+# https://peps.python.org/pep-0008/#blank-lines
+ignore = E302, E305          
