@@ -188,34 +188,24 @@ class AbstractPublisher(abc.ABC):
             }
 
         self.publisher = publisher
+        self.mqtt_config = mqtt_config
 
-        self.max_retries = mqtt_config['max_retries']
-        self.retry_wait = mqtt_config['retry_wait']
-        log_mqtt = mqtt_config['log_mqtt']
-        self.host = mqtt_config['host']
-        self.keepalive = mqtt_config['keepalive']
-        self.port = mqtt_config['port']
-        username = mqtt_config['username']
-        password = mqtt_config['password']
-        clientid = mqtt_config['clientid']
-        self.protocol = mqtt_config['protocol']
+        #self.max_retries = mqtt_config['max_retries']
+        #self.retry_wait = mqtt_config['retry_wait']
+        #log_mqtt = mqtt_config['log_mqtt']
+        #self.host = mqtt_config['host']
+        #self.keepalive = mqtt_config['keepalive']
+        #self.port = mqtt_config['port']
+        #username = mqtt_config['username']
+        #password = mqtt_config['password']
+        #clientid = mqtt_config['clientid']
+        #self.protocol = mqtt_config['protocol']
 
-        loginf(f"host is {self.host}")
-        loginf(f"port is {self.port}")
-        loginf(f"keepalive is {self.keepalive}")
-        loginf(f"protocol is {self.protocol}")
-        loginf(f"username is {username}")
-        if password is not None:
-            loginf("password is set")
-        else:
-            loginf("password is not set")
-            loginf(f"clientid is {clientid}")
+        self.client = self.get_client(mqtt_config['clientid'], mqtt_config['protocol'])
+        self.set_callbacks(mqtt_config['log_mqtt'])
 
-        self.client = self.get_client(clientid, self.protocol)
-        self.set_callbacks(log_mqtt)
-
-        if username is not None and password is not None:
-            self.client.username_pw_set(username, password)
+        if mqtt_config['username'] is not None and mqtt_config['password'] is not None:
+            self.client.username_pw_set(mqtt_config['username'], mqtt_config['password'])
 
         tls_dict = mqtt_config.get('tls')
         if tls_dict:
@@ -244,7 +234,7 @@ class AbstractPublisher(abc.ABC):
 
     def _connect(self):
         try:
-            self.connect(self.host, self.port, self.keepalive)
+            self.connect(self.mqtt_config['host'], self.mqtt_config['port'], self.mqtt_config['keepalive'])
         except Exception as exception: # (want to catch all) pylint: disable=broad-except
             logerr(f"MQTT connect failed with {type(exception)} and reason {exception}.")
             logerr(f"{traceback.format_exc()}")
@@ -259,13 +249,13 @@ class AbstractPublisher(abc.ABC):
             time.sleep(5)
 
             retries += 1
-            if retries > self.max_retries:
+            if retries > self.mqtt_config['max_retries']:
                 # Shut thread down, a bit of a hack
                 self.publisher.running = False
                 return
 
             try:
-                self.connect(self.host, self.port, self.keepalive)
+                self.connect(self.mqtt_config['host'], self.mqtt_config['port'], self.mqtt_config['keepalive'])
             except Exception as exception: # (want to catch all) pylint: disable=broad-except
                 logerr(f"MQTT connect failed with {type(exception)} and reason {exception}.")
                 logerr(f"{traceback.format_exc()}")
@@ -283,7 +273,7 @@ class AbstractPublisher(abc.ABC):
             self.client.loop(timeout=5.0)
 
             retries += 1
-            if retries > self.max_retries:
+            if retries > self.mqtt_config['max_retries']:
                 # Shut thread down, a bit of a hack
                 self.publisher.running = False
                 return
@@ -605,7 +595,7 @@ class MQTTPublish(StdService):
         self.mqtt_config['keepalive'] = to_int(service_dict.get('keepalive', 60))
 
         self.mqtt_config['max_retries'] = to_int(service_dict.get('max_retries', 5))
-        self.mqtt_config['retry_wait'] = to_int(service_dict.get('retry_wait', 5))
+        #self.mqtt_config['retry_wait'] = to_int(service_dict.get('retry_wait', 5))
         self.mqtt_config['log_mqtt'] = to_bool(service_dict.get('log', False))
         self.mqtt_config['host'] = service_dict.get('host', 'localhost')
         self.mqtt_config['port'] = to_int(service_dict.get('port', 1883))
