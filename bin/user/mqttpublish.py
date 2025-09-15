@@ -584,7 +584,6 @@ class MQTTPublish(StdService):
         self.mqtt_config['keepalive'] = to_int(service_dict.get('keepalive', 60))
 
         self.mqtt_config['max_retries'] = to_int(service_dict.get('max_retries', 5))
-        # self.mqtt_config['retry_wait'] = to_int(service_dict.get('retry_wait', 5))
         self.mqtt_config['log_mqtt'] = to_bool(service_dict.get('log', False))
         self.mqtt_config['host'] = service_dict.get('host', 'localhost')
         self.mqtt_config['port'] = to_int(service_dict.get('port', 1883))
